@@ -1,12 +1,9 @@
 ﻿param(
-    [string]$Downloads = '',
-    [string]$ScadRoot = '',
     [string]$StateDir = '',
     [string]$InstanceName = 'ScadDropTray',
     [int]$StartDelay = 0,
     [switch]$SelfTest,
-    [switch]$SelfTestRestart,
-    [string]$SelfTestOpen = ''
+    [switch]$SelfTestRestart
 )
 
 if ($StartDelay -gt 0) {
@@ -14,16 +11,13 @@ if ($StartDelay -gt 0) {
 }
 
 $ErrorActionPreference = 'Stop'
-if (-not $Downloads) { $Downloads = Join-Path $env:USERPROFILE 'Downloads' }
-if (-not $ScadRoot) { $ScadRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'SCAD' }
 if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:Downloads = [IO.Path]::GetFullPath($Downloads)
-$script:ScadRoot = [IO.Path]::GetFullPath($ScadRoot)
+$script:ProjectRoot = Split-Path -Parent $PSScriptRoot
 $script:StateDir = [IO.Path]::GetFullPath($StateDir)
-$workspaceRoot = Split-Path -Parent $script:ScadRoot
+$workspaceRoot = $script:ProjectRoot
 $script:AppVersion = '1.0.4'
 try {
     $v = (Get-Content -LiteralPath (Join-Path $workspaceRoot 'VERSION') -Raw).Trim()
@@ -42,21 +36,15 @@ $script:AppVersionLabel = if ($script:AppBuild -gt 0) {
 New-Item -ItemType Directory -Force -Path $script:StateDir | Out-Null
 $script:StatePath = Join-Path $script:StateDir 'tray.json'
 $script:LogPath = Join-Path $script:StateDir 'tray.log'
-$script:ProgressDir = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\state\progress'
-$script:RendererStateDir = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\state'
+$script:ProgressDir = Join-Path $script:ProjectRoot 'scad-variants\state\progress'
+$script:RendererStateDir = Join-Path $script:ProjectRoot 'scad-variants\state'
 $script:UiSettingsPath = Join-Path $script:RendererStateDir 'ui-settings.json'
 $script:GalleryServerState = Join-Path $script:RendererStateDir 'gallery-server.json'
 $script:ServerStatusItem = $null
 $script:ServerCpuLast = $null
 $script:ServerCpuAt = $null
 
-$script:AutoOpen = $false
 $script:AutoOpenResults = $true
-$script:Seen = [System.Collections.Generic.HashSet[string]]::new()
-$script:Recent = @()
-$script:LastProcessed = $null
-$script:Pending = @{}
-$script:RenderProcs = @{}
 $script:RestartRequested = $false
 $script:ProgressUi = @()
 $script:MenuFilter = $null
@@ -75,8 +63,17 @@ function Normalize-Path([string]$Path) {
 }
 
 function Get-OpenScadPath {
-    # Prefer the portable Manifold-capable snapshot in the workspace.
-    $tools = Join-Path (Split-Path -Parent $script:ScadRoot) 'tools'
+    if ($env:OPENSCAD -and (Test-Path -LiteralPath $env:OPENSCAD)) {
+        return $env:OPENSCAD
+    }
+    $portable = @(
+        (Join-Path $script:ProjectRoot 'openscad\openscad.exe'),
+        (Join-Path $script:ProjectRoot 'openscad.exe')
+    )
+    foreach ($candidate in $portable) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+    $tools = Join-Path $script:ProjectRoot 'tools'
     if (Test-Path -LiteralPath $tools) {
         $snapshots = @(
             Get-ChildItem -LiteralPath $tools -Directory -Filter 'openscad-*' `
@@ -87,9 +84,18 @@ function Get-OpenScadPath {
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
     }
-    # The scoop shim is a console wrapper and opens a terminal. The
-    # "current" junction also breaks older OpenSCAD builds (boost read_symlink),
-    # so prefer a real versioned GUI executable.
+    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $bases = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)
+    foreach ($base in $bases) {
+        if (-not $base) { continue }
+        foreach ($candidate in @(
+            (Join-Path $base 'OpenSCAD\openscad.exe'),
+            (Join-Path $base 'Programs\OpenSCAD\openscad.exe')
+        )) {
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+    }
     $appsRoot = Join-Path $env:USERPROFILE 'scoop\apps\openscad'
     if (Test-Path -LiteralPath $appsRoot) {
         $versions = @(
@@ -101,21 +107,19 @@ function Get-OpenScadPath {
             $candidate = Join-Path $version.FullName 'openscad.exe'
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
+        $current = Join-Path $appsRoot 'current\openscad.exe'
+        if (Test-Path -LiteralPath $current) { return $current }
     }
-    $current = Join-Path $appsRoot 'current\openscad.exe'
-    if (Test-Path -LiteralPath $current) { return $current }
-    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-    $fallback = 'C:\Users\ak\scoop\shims\openscad.exe'
-    if (Test-Path -LiteralPath $fallback) { return $fallback }
+    $scoopShim = Join-Path $env:USERPROFILE 'scoop\shims\openscad.exe'
+    if (Test-Path -LiteralPath $scoopShim) { return $scoopShim }
+    if ($env:ProgramData) {
+        $choco = Join-Path $env:ProgramData 'chocolatey\bin\openscad.exe'
+        if (Test-Path -LiteralPath $choco) { return $choco }
+    }
     return $null
 }
 
 function Get-OpenScadIconPath {
-    # The scoop shim has a generic console icon; use the real OpenSCAD exe so
-    # the tray icon is the recognizable yellow/green OpenSCAD logo.
-    $actual = 'C:\Users\ak\scoop\apps\openscad\2021.01\openscad.exe'
-    if (Test-Path -LiteralPath $actual) { return $actual }
     return (Get-OpenScadPath)
 }
 
@@ -129,9 +133,9 @@ function Get-PythonwPath {
 
 function Open-RenderPreview([string]$Index) {
     $pythonw = Get-PythonwPath
-    $helper = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\open_render.py'
+    $helper = Join-Path $script:ProjectRoot 'scad-variants\open_gallery.py'
     if ($pythonw -and (Test-Path -LiteralPath $helper)) {
-        Start-Process -FilePath $pythonw -ArgumentList @($helper, $Index) -WindowStyle Hidden | Out-Null
+        Start-Process -FilePath $pythonw -ArgumentList @($helper, '--reuse-tab', $Index) -WindowStyle Hidden | Out-Null
         return
     }
     Start-Process -FilePath $Index | Out-Null
@@ -206,57 +210,35 @@ public static class ScadFolderMenuIcon
     return $script:FolderMenuIcon
 }
 
-function Get-ScadFiles {
-    if (-not (Test-Path -LiteralPath $script:Downloads)) { return @() }
-    return @(
-        Get-ChildItem -LiteralPath $script:Downloads -File -Filter '*.scad' `
-            -ErrorAction SilentlyContinue | Sort-Object LastWriteTime
-    )
-}
-
 function Get-RecentRenders {
-    if (-not (Test-Path -LiteralPath $script:Downloads)) { return @() }
+    $recentPath = Join-Path $script:StateDir 'recent.json'
+    if (-not (Test-Path -LiteralPath $recentPath)) { return @() }
+    try {
+        $payload = Get-Content -LiteralPath $recentPath -Raw | ConvertFrom-Json
+    } catch {
+        return @()
+    }
     $items = @()
-    $manifests = @(
-        Get-ChildItem -LiteralPath $script:Downloads -File -Filter 'manifest.json' `
-            -Recurse -ErrorAction SilentlyContinue
-    )
-    foreach ($manifest in $manifests) {
-        $folder = $manifest.Directory
-        if (-not $folder) { continue }
-        $index = Join-Path $folder.FullName 'index.html'
-        if (-not (Test-Path -LiteralPath $index)) { continue }
-        try {
-            $data = Get-Content -LiteralPath $manifest.FullName -Raw | ConvertFrom-Json
-        } catch {
-            continue
-        }
-        if ($null -eq $data -or -not $data.source) { continue }
-
-        $rawTime = [string]$data.updated_at
+    foreach ($entry in @($payload.items)) {
+        if ($null -eq $entry) { continue }
+        $index = [string]$entry.index
+        if (-not $index -or -not (Test-Path -LiteralPath $index)) { continue }
+        $folder = Split-Path -Parent $index
         $when = [datetime]::MinValue
-        if (-not [datetime]::TryParse(
-                $rawTime,
-                [Globalization.CultureInfo]::InvariantCulture,
-                [Globalization.DateTimeStyles]::RoundtripKind,
-                [ref]$when)) {
-            $when = $manifest.LastWriteTime
-        }
-
-        $base = $folder.Name
-        if ($base -like '*_renders') {
-            $name = $base.Substring(0, $base.Length - 8)
-        } else {
-            $name = [IO.Path]::GetFileNameWithoutExtension([string]$data.source.rel)
-        }
-        if (-not $name) { $name = $base }
-
+        [void][datetime]::TryParse(
+            [string]$entry.updated_at,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind,
+            [ref]$when)
+        if ($when -eq [datetime]::MinValue) { $when = (Get-Item -LiteralPath $index).LastWriteTime }
+        $name = [string]$entry.name
+        if (-not $name) { $name = [IO.Path]::GetFileName($folder) }
         $items += [pscustomobject]@{
             Name = $name
             When = $when
             Date = $when.ToString('dd.MM.yyyy')
             Time = $when.ToString('HH:mm')
-            Folder = $folder.FullName
+            Folder = $folder
             Index = $index
         }
     }
@@ -447,11 +429,7 @@ function Load-RendererSettings {
 
 function Save-TrayState {
     $payload = [ordered]@{
-        auto_open      = [bool]$script:AutoOpen
         auto_open_results = [bool]$script:AutoOpenResults
-        seen           = @($script:Seen)
-        recent         = @($script:Recent)
-        last_processed = $script:LastProcessed
     }
     $json = $payload | ConvertTo-Json -Depth 5
     $tmp = $script:StatePath + '.tmp'
@@ -463,20 +441,8 @@ function Load-TrayState {
     if (Test-Path -LiteralPath $script:StatePath) {
         try {
             $saved = Get-Content -LiteralPath $script:StatePath -Raw | ConvertFrom-Json
-            $script:AutoOpen = [bool]$saved.auto_open
             if ($saved.PSObject.Properties.Name -contains 'auto_open_results') {
                 $script:AutoOpenResults = [bool]$saved.auto_open_results
-            }
-            if ($saved.seen) {
-                foreach ($item in @($saved.seen)) {
-                    if ($item) { [void]$script:Seen.Add([string]$item) }
-                }
-            }
-            if ($saved.recent) {
-                $script:Recent = @($saved.recent | ForEach-Object { [string]$_ })
-            }
-            if ($saved.last_processed) {
-                $script:LastProcessed = [string]$saved.last_processed
             }
         } catch {
             Write-TrayLog "state read failed: $($_.Exception.Message)"
@@ -484,70 +450,6 @@ function Load-TrayState {
     }
 
     Load-RendererSettings
-
-    $script:Seen.Clear()
-    $script:Pending.Clear()
-    $script:Recent = @()
-}
-
-function Add-Recent([string]$Path) {
-    $key = Normalize-Path $Path
-    $others = @(
-        $script:Recent | Where-Object {
-            $_ -and ((Normalize-Path $_) -ne $key)
-        }
-    )
-    $script:Recent = @($Path) + $others
-    if ($script:Recent.Count -gt 10) {
-        $script:Recent = $script:Recent[0..9]
-    }
-}
-
-function Start-OpenScad([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    $exe = Get-OpenScadPath
-    if (-not $exe) {
-        Write-TrayLog 'OpenSCAD not found'
-        return
-    }
-    try {
-        Start-Process -FilePath $exe -ArgumentList ('"' + $Path + '"') | Out-Null
-        $script:LastProcessed = $Path
-        Save-TrayState
-        Write-TrayLog "open in OpenSCAD: $Path"
-    } catch {
-        Write-TrayLog "open failed: $($_.Exception.Message)"
-    }
-}
-
-function Start-Render([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    $key = Normalize-Path $Path
-    if ($script:RenderProcs.ContainsKey($key)) {
-        $existing = $script:RenderProcs[$key]
-        if ($existing -and -not $existing.HasExited) {
-            Write-TrayLog "already rendering: $Path"
-            return
-        }
-    }
-
-    $pythonw = Get-PythonwPath
-    if (-not $pythonw) {
-        Write-TrayLog 'pythonw.exe not found'
-        return
-    }
-    $dropScript = Join-Path $PSScriptRoot 'scad_drop.py'
-    try {
-        $argLine = '-u "' + $dropScript + '" --render-file "' + $Path + '"'
-        $proc = Start-Process -FilePath $pythonw -ArgumentList $argLine `
-            -WindowStyle Hidden -PassThru
-        $script:RenderProcs[$key] = $proc
-        $script:LastProcessed = $Path
-        Save-TrayState
-        Write-TrayLog "render: $Path"
-    } catch {
-        Write-TrayLog "render failed: $($_.Exception.Message)"
-    }
 }
 
 function Exit-Tray {
@@ -572,93 +474,121 @@ function Exit-Tray {
     }
 }
 
+function Open-ChangelogPreview {
+    $root = $script:ProjectRoot
+    $source = Join-Path $root 'CHANGELOG.md'
+    if (-not (Test-Path -LiteralPath $source)) {
+        Write-TrayLog "changelog missing: $source"
+        return
+    }
+
+    $marked = Join-Path $PSScriptRoot 'vendor\marked.min.js'
+    if (-not (Test-Path -LiteralPath $marked)) {
+        Start-Process -FilePath $source | Out-Null
+        Write-TrayLog "changelog renderer missing; opened source: $source"
+        return
+    }
+
+    try {
+        $markdown = [IO.File]::ReadAllText($source, [Text.Encoding]::UTF8)
+        $encoded = [System.Net.WebUtility]::HtmlEncode($markdown)
+        $markedUri = ([Uri]$marked).AbsoluteUri
+        $template = @'
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>SCAD Render — история изменений</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    background: #f6f8fa;
+    color: #1f2328;
+    font: 16px/1.55 "Segoe UI", Arial, sans-serif;
+  }
+  main {
+    max-width: 980px;
+    margin: 40px auto 80px;
+    padding: 40px 48px;
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(140, 149, 159, .12);
+  }
+  h1, h2, h3, h4 { line-height: 1.25; margin: 1.4em 0 .55em; }
+  h1 { font-size: 2em; border-bottom: 1px solid #d8dee4; padding-bottom: .3em; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid #d8dee4; padding-bottom: .3em; }
+  h3 { font-size: 1.2em; }
+  p, ul, ol { margin: .7em 0; }
+  li { margin: .25em 0; }
+  code {
+    font: 85%/1.45 Consolas, "Cascadia Mono", monospace;
+    background: #eff1f3;
+    border-radius: 4px;
+    padding: .15em .35em;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #d8dee4;
+    border-radius: 6px;
+    padding: 14px;
+    overflow: auto;
+  }
+  pre code { background: transparent; padding: 0; }
+  a { color: #0969da; }
+  hr { border: 0; border-top: 1px solid #d8dee4; margin: 1.8em 0; }
+  blockquote {
+    margin: 1em 0;
+    padding: .3em 1em;
+    color: #59636e;
+    border-left: 4px solid #d0d7de;
+  }
+  table { border-collapse: collapse; margin: 1em 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 12px; }
+  th { background: #f6f8fa; }
+  img { max-width: 100%; }
+  .meta { color: #59636e; font-size: 13px; border-top: 1px solid #d8dee4; padding-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="content"><p>Загрузка…</p></div>
+  <p class="meta">Локальный <code>CHANGELOG.md</code>, включая ещё не запушенные изменения.</p>
+</main>
+<script src="__MARKED__"></script>
+<script id="markdown-source" type="text/plain">__SOURCE__</script>
+<script>
+  const source = document.getElementById('markdown-source').textContent;
+  const content = document.getElementById('content');
+  if (window.marked) {
+    content.innerHTML = marked.parse(source);
+    document.querySelectorAll('#content a').forEach(function (link) {
+      link.target = '_blank';
+      link.rel = 'noopener';
+    });
+  } else {
+    content.textContent = source;
+  }
+</script>
+</body>
+</html>
+'@
+        $html = $template.Replace('__MARKED__', $markedUri).Replace('__SOURCE__', $encoded)
+        $htmlPath = Join-Path $script:StateDir 'changelog.html'
+        [IO.File]::WriteAllText($htmlPath, $html, [Text.UTF8Encoding]::new($false))
+        Start-Process -FilePath $htmlPath | Out-Null
+        Write-TrayLog "open changelog preview: $htmlPath"
+    } catch {
+        Write-TrayLog "changelog preview failed: $($_.Exception.Message)"
+        try { Start-Process -FilePath $source | Out-Null } catch { }
+    }
+}
+
 function Restart-Tray {
     Write-TrayLog 'restart requested'
     $script:RestartRequested = $true
     Exit-Tray
-}
-
-function Get-RenderDir([string]$Path) {
-    $folder = [IO.Path]::GetDirectoryName($Path)
-    $name = [IO.Path]::GetFileNameWithoutExtension($Path)
-    return (Join-Path $folder ($name + '_renders'))
-}
-
-function Open-RenderDir([string]$Path) {
-    $renderDir = Get-RenderDir $Path
-    if (-not (Test-Path -LiteralPath $renderDir)) {
-        Write-TrayLog "render folder missing: $renderDir"
-        return
-    }
-    Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $renderDir + '"') | Out-Null
-    Write-TrayLog "open render folder: $renderDir"
-}
-
-function Open-RenderHtml([string]$Path) {
-    $renderDir = Get-RenderDir $Path
-    $index = Join-Path $renderDir 'index.html'
-    if (-not (Test-Path -LiteralPath $index)) {
-        Write-TrayLog "gallery missing: $index"
-        return
-    }
-    $pythonw = Get-PythonwPath
-    $helper = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\open_gallery.py'
-    if (-not $pythonw -or -not (Test-Path -LiteralPath $helper)) {
-        Write-TrayLog "gallery helper missing"
-        return
-    }
-    $argLine = '"' + $helper + '" "' + $index + '"'
-    Start-Process -FilePath $pythonw -ArgumentList $argLine -WindowStyle Hidden | Out-Null
-    Write-TrayLog "open gallery isolated: $index"
-}
-
-function Add-FileActions($Items, [string]$Path) {
-    $renderDir = Get-RenderDir $Path
-    $hasResults = (Test-Path -LiteralPath $renderDir) -and (
-        Test-Path -LiteralPath (Join-Path $renderDir 'index.html')
-    )
-
-    $open = New-Object System.Windows.Forms.ToolStripMenuItem
-    $open.Text = 'Открыть в OpenSCAD'
-    $open.Tag = $Path
-    $open.ToolTipText = $Path
-    $open.add_Click({ Start-OpenScad $this.Tag })
-    [void]$Items.Add($open)
-
-    $render = New-Object System.Windows.Forms.ToolStripMenuItem
-    $render.Text = 'Запустить рендеринг'
-    $render.Tag = $Path
-    $render.ToolTipText = $Path
-    $render.add_Click({ Start-Render $this.Tag })
-    [void]$Items.Add($render)
-
-    $results = New-Object System.Windows.Forms.ToolStripMenuItem
-    $results.Text = 'Открыть результаты рендера'
-    $results.Tag = $Path
-    $results.Enabled = [bool]$hasResults
-    $results.ToolTipText = if ($hasResults) {
-        $renderDir
-    } else {
-        'Рендер ещё не завершён — готовой папки с результатами нет'
-    }
-    if ($hasResults) {
-        $results.add_Click({ Open-RenderHtml $this.Tag })
-    }
-    [void]$Items.Add($results)
-
-    $folder = New-Object System.Windows.Forms.ToolStripMenuItem
-    $folder.Text = 'Открыть папку результатов'
-    $folder.Tag = $Path
-    $folder.Enabled = [bool]$hasResults
-    $folder.ToolTipText = if ($hasResults) {
-        $renderDir
-    } else {
-        'Рендер ещё не завершён — готовой папки нет'
-    }
-    if ($hasResults) {
-        $folder.add_Click({ Open-RenderDir $this.Tag })
-    }
-    [void]$Items.Add($folder)
 }
 
 function Build-TrayMenu {
@@ -833,10 +763,29 @@ function Build-TrayMenu {
 
         [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
+        $service = New-Object System.Windows.Forms.ToolStripMenuItem
+        $service.Text = 'Сервис'
+
         $restart = New-Object System.Windows.Forms.ToolStripMenuItem
         $restart.Text = 'Перезагрузить программу'
         $restart.add_Click({ Restart-Tray })
-        [void]$menu.Items.Add($restart)
+        [void]$service.DropDownItems.Add($restart)
+        [void]$service.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+        $history = New-Object System.Windows.Forms.ToolStripMenuItem
+        $history.Text = 'Открыть историю изменений'
+        $history.add_Click({ Open-ChangelogPreview })
+        [void]$service.DropDownItems.Add($history)
+
+        $github = New-Object System.Windows.Forms.ToolStripMenuItem
+        $github.Text = 'Открыть GitHub'
+        $github.add_Click({
+            Start-Process -FilePath 'https://github.com/akork/scad-renderer' | Out-Null
+            Write-TrayLog 'open GitHub repository'
+        })
+        [void]$service.DropDownItems.Add($github)
+
+        [void]$menu.Items.Add($service)
 
         $exit = New-Object System.Windows.Forms.ToolStripMenuItem
         $exit.Text = 'Выход'
@@ -886,12 +835,7 @@ if ($SelfTestRestart) {
     exit 42
 }
 
-if ($SelfTestOpen) {
-    Start-OpenScad $SelfTestOpen
-    exit 0
-}
-
-if (-not $SelfTest -and -not $SelfTestRestart -and -not $SelfTestOpen) {
+if (-not $SelfTest -and -not $SelfTestRestart) {
     Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
 namespace ScadTrayWin {

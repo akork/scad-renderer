@@ -146,6 +146,13 @@ def gallery_url(index_path: Path) -> str:
     return f"{base}/r/{encode_folder(index_path.parent)}/index.html"
 
 
+def viewer_url(folder: Path, model: str) -> str:
+    folder = folder.resolve()
+    base, _ = ensure_server()
+    model_name = urllib.parse.quote(Path(model).name)
+    return f"{base}/r/{encode_folder(folder)}/viewer.html?name={model_name}"
+
+
 def open_gallery_page(index_path: Path) -> bool:
     url = gallery_url(index_path)
     return open_in_isolated(

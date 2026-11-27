@@ -21,10 +21,8 @@ scad-drop/**/__pycache__/
 scad-drop/**/*.pyc
 
 # Local generated renders / slots / tool binaries are never part of the app
-SCAD/
 orca-slots/
 tools/
-deliverables/
 
 # Keep local helper files out
 *.log
