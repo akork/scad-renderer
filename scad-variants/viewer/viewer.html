@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D — SCAD</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; color: #e2e8f0; font-family: "Segoe UI", system-ui, sans-serif; }
+  canvas { display: block; }
+  header {
+    position: fixed; z-index: 10; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    background: linear-gradient(to bottom, rgba(2, 6, 23, .92), rgba(2, 6, 23, .35));
+    backdrop-filter: blur(6px);
+  }
+  header .name { font-weight: 700; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .spacer { flex: 1; }
+  button {
+    border: 1px solid rgba(148, 163, 184, .45); background: rgba(15, 23, 42, .8);
+    color: #e2e8f0; border-radius: 9px; padding: 7px 11px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  button:hover { background: rgba(30, 41, 59, .95); }
+  button.active { border-color: #2dd4bf; color: #99f6e4; }
+  #hint {
+    position: fixed; z-index: 10; left: 16px; bottom: 14px; right: 16px;
+    color: #94a3b8; font-size: 12px; pointer-events: none;
+  }
+  .tabs { display: none; gap: 5px; margin-left: 10px; }
+  .tabs button {
+    border: 1px solid rgba(148, 163, 184, .45); background: rgba(15, 23, 42, .8);
+    color: #cbd5e1; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .tabs button.active { border-color: #2dd4bf; color: #99f6e4; background: rgba(15, 118, 110, .38); }
+  #code-panel {
+    position: fixed; z-index: 8; top: 58px; left: 0; right: 0; bottom: 0;
+    display: none; flex-direction: column; background: #0b1220;
+  }
+  body.code-mode #code-panel { display: flex; }
+  body.code-mode canvas { display: none; }
+  body.code-mode #reset, body.code-mode #spin, body.code-mode #hint { display: none; }
+  .code-head {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, .18); color: #cbd5e1; font-size: 12px;
+  }
+  .code-head span { flex: 1; font-family: Consolas, monospace; }
+  .code-head button {
+    border: 1px solid rgba(148, 163, 184, .45); background: rgba(15, 23, 42, .8);
+    color: #e2e8f0; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer;
+  }
+  #code-content {
+    flex: 1; margin: 0; padding: 16px 18px 30px; overflow: auto;
+    color: #dbeafe; background: #0b1220;
+    font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px;
+    line-height: 1.55; white-space: pre; tab-size: 4;
+  }
+  #loading {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; background: #0b1220;
+    transition: opacity .25s ease;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: 4px solid rgba(148, 163, 184, .2); border-top-color: #2dd4bf;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #progress { color: #94a3b8; font-size: 13px; }
+  #error {
+    position: fixed; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    max-width: min(680px, 90vw); background: #450a0a; border: 1px solid #7f1d1d;
+    border-radius: 12px; padding: 16px 18px; color: #fecaca; display: none;
+    white-space: pre-wrap; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <span class="name" id="model-name">STL</span>
+  <div class="tabs">
+    <button type="button" id="tab-3d" class="active">3D</button>
+    <button type="button" id="tab-code">Код SCAD</button>
+  </div>
+  <span class="spacer"></span>
+  <button id="reset">Сброс камеры</button>
+  <button id="spin">Авто-вращение</button>
+  <button id="close">Закрыть</button>
+</header>
+<section id="code-panel">
+  <div class="code-head">
+    <span id="code-title">Исходник</span>
+    <button type="button" id="copy-code">Копировать код</button>
+  </div>
+  <pre id="code-content">Загрузка…</pre>
+</section>
+<div id="loading">
+  <div class="spinner"></div>
+  <div id="progress">Загрузка STL…</div>
+</div>
+<div id="error"></div>
+<div id="hint">Левая кнопка — вращение · колесо — масштаб · правая кнопка — сдвиг</div>
+
+<script src="/vendor/three.min.js"></script>
+<script src="/vendor/STLLoader.js"></script>
+<script src="/vendor/OrbitControls.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const params = new URLSearchParams(window.location.search);
+  const modelName = params.get("name") || "STL";
+  document.getElementById("model-name").textContent = modelName;
+  document.title = "3D — " + modelName;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1220);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000000);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.72;
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.autoRotateSpeed = 1.8;
+  controls.screenSpacePanning = true;
+
+  scene.add(new THREE.HemisphereLight(0xdbeafe, 0x0f172a, 0.75));
+  const key = new THREE.DirectionalLight(0xffffff, 0.85);
+  key.position.set(1, 2, 2);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x93c5fd, 0.3);
+  fill.position.set(-2, -1, -2);
+  scene.add(fill);
+
+  let mesh = null;
+  let radius = 1;
+
+  function fitCamera() {
+    if (!mesh) return;
+    const fov = camera.fov * Math.PI / 180;
+    const distance = Math.max(radius / Math.sin(fov / 2) * 1.25, 1);
+    camera.near = Math.max(distance / 2000, 0.001);
+    camera.far = distance * 200;
+    camera.position.set(distance * 0.9, distance * 0.65, distance * 0.9);
+    camera.updateProjectionMatrix();
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
+
+  document.getElementById("reset").addEventListener("click", fitCamera);
+  const spinButton = document.getElementById("spin");
+  spinButton.addEventListener("click", function () {
+    controls.autoRotate = !controls.autoRotate;
+    spinButton.classList.toggle("active", controls.autoRotate);
+  });
+
+  function requestClose() {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "scad-viewer-close" }, "*");
+      return;
+    }
+    window.close();
+    setTimeout(function () {
+      if (!window.closed) {
+        document.getElementById("hint").textContent = "Закрой вкладку вручную";
+      }
+    }, 250);
+  }
+
+  document.getElementById("close").addEventListener("click", requestClose);
+
+  const tab3d = document.getElementById("tab-3d");
+  const tabCode = document.getElementById("tab-code");
+  const codeContent = document.getElementById("code-content");
+  let sourceLoaded = false;
+  const tokenMatch = location.pathname.match(/\/r\/([^/]+)\/viewer\.html/);
+  const sourceToken = tokenMatch ? tokenMatch[1] : "";
+
+  function setMode(mode) {
+    const isCode = mode === "code";
+    document.body.classList.toggle("code-mode", isCode);
+    tab3d.classList.toggle("active", !isCode);
+    tabCode.classList.toggle("active", isCode);
+    controls.enabled = !isCode;
+    if (isCode && !sourceLoaded) loadSource();
+  }
+
+  function loadSource() {
+    const url = sourceToken
+      ? "/source?folder=" + encodeURIComponent(sourceToken)
+      : "/source";
+    fetch(url, { cache: "no-store" })
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.text();
+      })
+      .then(function (text) {
+        codeContent.textContent = text;
+        sourceLoaded = true;
+      })
+      .catch(function (error) {
+        codeContent.textContent = "Не удалось загрузить исходник: " + error.message;
+      });
+  }
+
+  tab3d.addEventListener("click", function () { setMode("3d"); });
+  tabCode.addEventListener("click", function () { setMode("code"); });
+
+  document.getElementById("copy-code").addEventListener("click", function () {
+    const button = this;
+    const text = codeContent.textContent || "";
+    const done = function (ok) {
+      button.textContent = ok ? "Скопировано" : "Не удалось";
+      setTimeout(function () { button.textContent = "Копировать код"; }, 1600);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      return;
+    }
+    try {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.top = "-1000px";
+      document.body.appendChild(area);
+      area.select();
+      done(document.execCommand("copy"));
+      area.remove();
+    } catch (e) {
+      done(false);
+    }
+  });
+
+  // A short click closes the viewer; a drag (rotation/pan) does not.
+  let tapStart = null;
+  const canvas = renderer.domElement;
+  canvas.addEventListener("pointerdown", function (event) {
+    if (event.button !== 0) return;
+    tapStart = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      time: performance.now(),
+      moved: false
+    };
+  });
+  window.addEventListener("pointermove", function (event) {
+    if (!tapStart || event.pointerId !== tapStart.id) return;
+    if (Math.hypot(event.clientX - tapStart.x, event.clientY - tapStart.y) > 6) {
+      tapStart.moved = true;
+    }
+  });
+  window.addEventListener("pointerup", function (event) {
+    if (!tapStart || event.pointerId !== tapStart.id) return;
+    const start = tapStart;
+    tapStart = null;
+    const elapsed = performance.now() - start.time;
+    const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    if (!start.moved && distance <= 6 && elapsed < 400) {
+      requestClose();
+    }
+  });
+  window.addEventListener("pointercancel", function () {
+    tapStart = null;
+  });
+
+  const loading = document.getElementById("loading");
+  const progress = document.getElementById("progress");
+  const errorBox = document.getElementById("error");
+
+  function fail(message) {
+    loading.classList.add("hidden");
+    errorBox.style.display = "block";
+    errorBox.textContent = message;
+  }
+
+  const loader = new THREE.STLLoader();
+  loader.load(
+    "model.stl?name=" + encodeURIComponent(modelName),
+    function (geometry) {
+      geometry.computeBoundingBox();
+      const center = new THREE.Vector3();
+      geometry.boundingBox.getCenter(center);
+      geometry.translate(-center.x, -center.y, -center.z);
+      geometry.computeBoundingSphere();
+      radius = Math.max(geometry.boundingSphere.radius || 1, 0.001);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x2f7fa3,
+        metalness: 0.05,
+        roughness: 0.62,
+        side: THREE.DoubleSide
+      });
+      mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+      fitCamera();
+      loading.classList.add("hidden");
+    },
+    function (event) {
+      if (event && event.lengthComputable && event.total > 0) {
+        const percent = Math.min(100, Math.round(event.loaded / event.total * 100));
+        progress.textContent = "Загрузка STL… " + percent + "%";
+      } else {
+        progress.textContent = "Загрузка STL…";
+      }
+    },
+    function (err) {
+      fail("Не удалось загрузить STL.\n" + (err && err.message ? err.message : String(err)));
+    }
+  );
+
+  window.addEventListener("resize", function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  (function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+# The workspace contains unrelated projects and very large runtime folders.
+# Track only the SCAD renderer sources.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/scad-variants/
+!/scad-drop/
+
+# Runtime state, browser profiles, logs and caches
+scad-variants/state/
+scad-variants/.tmp-tests/
+scad-variants/**/__pycache__/
+scad-variants/**/*.pyc
+scad-drop/state/
+scad-drop/**/__pycache__/
+scad-drop/**/*.pyc
+
+# Local generated renders / slots / tool binaries are never part of the app
+SCAD/
+orca-slots/
+tools/
+deliverables/
+
+# Keep local helper files out
+*.log
+*.tmp
+*.zip
+.tmp*
