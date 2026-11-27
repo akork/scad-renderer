@@ -3,8 +3,7 @@
     [string]$InstanceName = 'ScadDropTray',
     [int]$StartDelay = 0,
     [switch]$SelfTest,
-    [switch]$SelfTestRestart,
-    [string]$SelfTestOpen = ''
+    [switch]$SelfTestRestart
 )
 
 if ($StartDelay -gt 0) {
@@ -45,13 +44,7 @@ $script:ServerStatusItem = $null
 $script:ServerCpuLast = $null
 $script:ServerCpuAt = $null
 
-$script:AutoOpen = $false
 $script:AutoOpenResults = $true
-$script:Seen = [System.Collections.Generic.HashSet[string]]::new()
-$script:Recent = @()
-$script:LastProcessed = $null
-$script:Pending = @{}
-$script:RenderProcs = @{}
 $script:RestartRequested = $false
 $script:ProgressUi = @()
 $script:MenuFilter = $null
@@ -420,11 +413,7 @@ function Load-RendererSettings {
 
 function Save-TrayState {
     $payload = [ordered]@{
-        auto_open      = [bool]$script:AutoOpen
         auto_open_results = [bool]$script:AutoOpenResults
-        seen           = @($script:Seen)
-        recent         = @($script:Recent)
-        last_processed = $script:LastProcessed
     }
     $json = $payload | ConvertTo-Json -Depth 5
     $tmp = $script:StatePath + '.tmp'
@@ -436,20 +425,8 @@ function Load-TrayState {
     if (Test-Path -LiteralPath $script:StatePath) {
         try {
             $saved = Get-Content -LiteralPath $script:StatePath -Raw | ConvertFrom-Json
-            $script:AutoOpen = [bool]$saved.auto_open
             if ($saved.PSObject.Properties.Name -contains 'auto_open_results') {
                 $script:AutoOpenResults = [bool]$saved.auto_open_results
-            }
-            if ($saved.seen) {
-                foreach ($item in @($saved.seen)) {
-                    if ($item) { [void]$script:Seen.Add([string]$item) }
-                }
-            }
-            if ($saved.recent) {
-                $script:Recent = @($saved.recent | ForEach-Object { [string]$_ })
-            }
-            if ($saved.last_processed) {
-                $script:LastProcessed = [string]$saved.last_processed
             }
         } catch {
             Write-TrayLog "state read failed: $($_.Exception.Message)"
@@ -457,70 +434,6 @@ function Load-TrayState {
     }
 
     Load-RendererSettings
-
-    $script:Seen.Clear()
-    $script:Pending.Clear()
-    $script:Recent = @()
-}
-
-function Add-Recent([string]$Path) {
-    $key = Normalize-Path $Path
-    $others = @(
-        $script:Recent | Where-Object {
-            $_ -and ((Normalize-Path $_) -ne $key)
-        }
-    )
-    $script:Recent = @($Path) + $others
-    if ($script:Recent.Count -gt 10) {
-        $script:Recent = $script:Recent[0..9]
-    }
-}
-
-function Start-OpenScad([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    $exe = Get-OpenScadPath
-    if (-not $exe) {
-        Write-TrayLog 'OpenSCAD not found'
-        return
-    }
-    try {
-        Start-Process -FilePath $exe -ArgumentList ('"' + $Path + '"') | Out-Null
-        $script:LastProcessed = $Path
-        Save-TrayState
-        Write-TrayLog "open in OpenSCAD: $Path"
-    } catch {
-        Write-TrayLog "open failed: $($_.Exception.Message)"
-    }
-}
-
-function Start-Render([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    $key = Normalize-Path $Path
-    if ($script:RenderProcs.ContainsKey($key)) {
-        $existing = $script:RenderProcs[$key]
-        if ($existing -and -not $existing.HasExited) {
-            Write-TrayLog "already rendering: $Path"
-            return
-        }
-    }
-
-    $pythonw = Get-PythonwPath
-    if (-not $pythonw) {
-        Write-TrayLog 'pythonw.exe not found'
-        return
-    }
-    $dropScript = Join-Path $PSScriptRoot 'scad_drop.py'
-    try {
-        $argLine = '-u "' + $dropScript + '" --render-file "' + $Path + '"'
-        $proc = Start-Process -FilePath $pythonw -ArgumentList $argLine `
-            -WindowStyle Hidden -PassThru
-        $script:RenderProcs[$key] = $proc
-        $script:LastProcessed = $Path
-        Save-TrayState
-        Write-TrayLog "render: $Path"
-    } catch {
-        Write-TrayLog "render failed: $($_.Exception.Message)"
-    }
 }
 
 function Exit-Tray {
@@ -660,89 +573,6 @@ function Restart-Tray {
     Write-TrayLog 'restart requested'
     $script:RestartRequested = $true
     Exit-Tray
-}
-
-function Get-RenderDir([string]$Path) {
-    $folder = [IO.Path]::GetDirectoryName($Path)
-    $name = [IO.Path]::GetFileNameWithoutExtension($Path)
-    return (Join-Path $folder ($name + '_renders'))
-}
-
-function Open-RenderDir([string]$Path) {
-    $renderDir = Get-RenderDir $Path
-    if (-not (Test-Path -LiteralPath $renderDir)) {
-        Write-TrayLog "render folder missing: $renderDir"
-        return
-    }
-    Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $renderDir + '"') | Out-Null
-    Write-TrayLog "open render folder: $renderDir"
-}
-
-function Open-RenderHtml([string]$Path) {
-    $renderDir = Get-RenderDir $Path
-    $index = Join-Path $renderDir 'index.html'
-    if (-not (Test-Path -LiteralPath $index)) {
-        Write-TrayLog "gallery missing: $index"
-        return
-    }
-    $pythonw = Get-PythonwPath
-    $helper = Join-Path $script:ProjectRoot 'scad-variants\open_gallery.py'
-    if (-not $pythonw -or -not (Test-Path -LiteralPath $helper)) {
-        Write-TrayLog "gallery helper missing"
-        return
-    }
-    $argLine = '"' + $helper + '" "' + $index + '"'
-    Start-Process -FilePath $pythonw -ArgumentList $argLine -WindowStyle Hidden | Out-Null
-    Write-TrayLog "open gallery isolated: $index"
-}
-
-function Add-FileActions($Items, [string]$Path) {
-    $renderDir = Get-RenderDir $Path
-    $hasResults = (Test-Path -LiteralPath $renderDir) -and (
-        Test-Path -LiteralPath (Join-Path $renderDir 'index.html')
-    )
-
-    $open = New-Object System.Windows.Forms.ToolStripMenuItem
-    $open.Text = 'Открыть в OpenSCAD'
-    $open.Tag = $Path
-    $open.ToolTipText = $Path
-    $open.add_Click({ Start-OpenScad $this.Tag })
-    [void]$Items.Add($open)
-
-    $render = New-Object System.Windows.Forms.ToolStripMenuItem
-    $render.Text = 'Запустить рендеринг'
-    $render.Tag = $Path
-    $render.ToolTipText = $Path
-    $render.add_Click({ Start-Render $this.Tag })
-    [void]$Items.Add($render)
-
-    $results = New-Object System.Windows.Forms.ToolStripMenuItem
-    $results.Text = 'Открыть результаты рендера'
-    $results.Tag = $Path
-    $results.Enabled = [bool]$hasResults
-    $results.ToolTipText = if ($hasResults) {
-        $renderDir
-    } else {
-        'Рендер ещё не завершён — готовой папки с результатами нет'
-    }
-    if ($hasResults) {
-        $results.add_Click({ Open-RenderHtml $this.Tag })
-    }
-    [void]$Items.Add($results)
-
-    $folder = New-Object System.Windows.Forms.ToolStripMenuItem
-    $folder.Text = 'Открыть папку результатов'
-    $folder.Tag = $Path
-    $folder.Enabled = [bool]$hasResults
-    $folder.ToolTipText = if ($hasResults) {
-        $renderDir
-    } else {
-        'Рендер ещё не завершён — готовой папки нет'
-    }
-    if ($hasResults) {
-        $folder.add_Click({ Open-RenderDir $this.Tag })
-    }
-    [void]$Items.Add($folder)
 }
 
 function Build-TrayMenu {
@@ -989,12 +819,7 @@ if ($SelfTestRestart) {
     exit 42
 }
 
-if ($SelfTestOpen) {
-    Start-OpenScad $SelfTestOpen
-    exit 0
-}
-
-if (-not $SelfTest -and -not $SelfTestRestart -and -not $SelfTestOpen) {
+if (-not $SelfTest -and -not $SelfTestRestart) {
     Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
 namespace ScadTrayWin {

@@ -20,6 +20,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   `SCAD` and `deliverables` folders are no longer used.
 - `[dev.9]` The tray recent-render list follows context-menu renders anywhere
   on disk instead of scanning a fixed Downloads folder.
+- `[dev.10]` Removed the “open in OpenSCAD” action and the local portable
+  OpenSCAD copy; rendering uses the installed OpenSCAD CLI.
 
 ## [1.1.2] - 2026-11-27
 
