@@ -107,17 +107,23 @@ python -m unittest discover -s tests
 
 ## Git
 
-The repository is ready for GitHub. Create an empty GitHub repository, then
-add it as `origin` and push:
+The repository is ready for GitHub. It is currently stored at:
 
-```powershell
-git remote add origin https://github.com/<user>/<repo>.git
-git branch -M main
-git push -u origin main
+```text
+https://github.com/akork/scad-renderer
 ```
 
-If GitHub CLI is available, authentication can be done with:
+The repository is **private**. Clone it anywhere and keep `scad-variants/` and
+`scad-drop/` as sibling folders:
 
 ```powershell
-gh auth login
+git clone https://github.com/akork/scad-renderer.git
+```
+
+After later edits:
+
+```powershell
+git add .
+git commit -m "Describe the change"
+git push
 ```
