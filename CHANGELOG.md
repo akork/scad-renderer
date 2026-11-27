@@ -6,6 +6,13 @@ Technical details, implementation attempts and architecture decisions belong in
 commit bodies, an optional `DEVLOG.md`, or ADRs — not in this file. The format
 follows Keep a Changelog and the project uses semantic versioning.
 
+## [Unreleased]
+
+### Fixed
+
+- `[dev.1]` PowerShell installer scripts keep the UTF-8 BOM, so Cyrillic
+  labels survive a fresh checkout or project move.
+
 ## [1.2.0] - 2026-11-27
 
 ### Added

@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 $ErrorActionPreference = 'Stop'
 
 $key = 'HKCU:\Software\Classes\SystemFileAssociations\.scad\shell\SCADRender'

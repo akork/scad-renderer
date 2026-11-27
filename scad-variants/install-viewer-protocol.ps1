@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $gallery = Join-Path $here 'open_gallery.py'
 $slicer = Join-Path $here 'slicer_action.py'

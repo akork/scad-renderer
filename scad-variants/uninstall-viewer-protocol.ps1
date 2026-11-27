@@ -1,4 +1,4 @@
-$keys = @(
+﻿$keys = @(
     'HKCU:\Software\Classes\scad-viewer',
     'HKCU:\Software\Classes\scad-gallery',
     'HKCU:\Software\Classes\scad-slot',
