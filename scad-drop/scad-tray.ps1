@@ -906,10 +906,52 @@ namespace ScadTrayWin {
 
 $script:Context = New-Object System.Windows.Forms.ApplicationContext
 
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class ScadTrayWindow
+{
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    public static void HideFromTaskbar(IntPtr hwnd)
+    {
+        const int GWL_EXSTYLE = -20;
+        const int WS_EX_TOOLWINDOW = 0x00000080;
+        const int WS_EX_APPWINDOW = 0x00040000;
+        const uint SWP_NOSIZE = 0x0001;
+        const uint SWP_NOMOVE = 0x0002;
+        const uint SWP_NOZORDER = 0x0004;
+        const uint SWP_NOACTIVATE = 0x0010;
+        const uint SWP_FRAMECHANGED = 0x0020;
+
+        int style = GetWindowLong(hwnd, GWL_EXSTYLE);
+        style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW;
+        SetWindowLong(hwnd, GWL_EXSTYLE, style);
+        SetWindowPos(
+            hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+}
+'@
+
 $script:Menu = New-Object System.Windows.Forms.ContextMenuStrip
 $script:Menu.add_Opening({
     $script:MenuButtonWasDown = [ScadTrayMenuFilter]::IsLeftButtonDown()
     Build-TrayMenu
+})
+$script:Menu.add_Opened({
+    try {
+        [ScadTrayWindow]::HideFromTaskbar($script:Menu.Handle)
+    } catch { }
 })
 
 Add-Type -TypeDefinition @'

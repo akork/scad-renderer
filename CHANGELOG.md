@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format follows Keep a Changelog, and the project uses semantic versioning.
 Git commit subjects are short labels; this file is the detailed history.
 
+## [1.1.2] - 2026-11-27
+
+### Fixed
+
+- Left-clicking the tray icon opens the context menu again.
+- The left-click menu no longer creates a separate taskbar button: the popup is
+  marked with `WS_EX_TOOLWINDOW`, `WS_EX_APPWINDOW` is removed, and
+  `SetWindowPos(... FRAMECHANGED)` is applied when it opens.
+- The hidden owner form was removed; the menu opens at the cursor.
+- Archive history of the four development attempts is preserved in the
+  `archive-1.1.1-dev` tag.
+
 ## [1.1.1] - 2026-11-27
 
 ### Fixed
