@@ -21,6 +21,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   fallback installer.
 - `[dev.5]` A standard Windows setup wizard, `SCADRendererSetup.exe`, which
   installs and registers the application in one double-click.
+- `[dev.6]` The setup detects an existing installation and offers
+  reinstall or remove; a Start Menu uninstall entry is added.
 
 ## [1.2.0] - 2026-11-27
 
