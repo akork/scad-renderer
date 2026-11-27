@@ -27,7 +27,18 @@ from pathlib import Path
 from typing import Any, Sequence
 
 APP_NAME = "scad-drop"
-APP_VERSION = "1.0"
+
+
+def _read_app_version() -> str:
+    candidate = Path(__file__).resolve().parent.parent / "VERSION"
+    try:
+        value = candidate.read_text(encoding="utf-8").strip()
+    except OSError:
+        return "1.0.0"
+    return value or "1.0.0"
+
+
+APP_VERSION = _read_app_version()
 
 DEFAULT_EXTENSIONS = (".scad",)
 DEFAULT_POLL = 2.0

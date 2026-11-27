@@ -4,6 +4,8 @@
 !/.gitignore
 !/.gitattributes
 !/README.md
+!/VERSION
+!/AGENTS.md
 !/scad-variants/
 !/scad-drop/
 

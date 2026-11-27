@@ -1,5 +1,7 @@
 # SCAD Renderer
 
+Current version: **1.0.0** (see `VERSION`).
+
 Source repository for the local OpenSCAD variant renderer, Explorer context-menu
 integration, tray control panel, gallery server and 3D preview.
 

@@ -34,7 +34,20 @@ from .gallery_server import open_gallery_page
 
 LOG = logging.getLogger("scadvariants")
 
-APP_VERSION = "1.0"
+
+def _read_app_version() -> str:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "VERSION"
+        try:
+            value = candidate.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if value:
+            return value
+    return "1.0.0"
+
+
+APP_VERSION = _read_app_version()
 
 # Values that are valid exports but very expensive to evaluate.  They are not
 # skipped: the size sorter puts them near the front when no previous STL size
