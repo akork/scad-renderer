@@ -30,7 +30,15 @@ If the application is already installed, the wizard offers:
 - **Удалить SCAD Renderer**.
 
 The Start Menu also gets a **Удалить SCAD Renderer** shortcut. The normal
-uninstaller is registered in Windows Apps & Features. After removal, a
+uninstaller is registered in Windows Apps & Features. The uninstall dialog
+offers:
+
+```text
+[x] Удалить также настройки, журналы и профиль браузера
+```
+
+It is enabled by default and removes the runtime state folder. Slots in
+`%USERPROFILE%\slicer-slots` are always preserved. After removal, a
 confirmation window is shown and closes automatically after 10 seconds.
 
 ## Release folder

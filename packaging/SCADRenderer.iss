@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.0-dev.8"
+  #define MyAppVersion "1.2.0-dev.9"
 #endif
 
 #define MyAppName "SCAD Renderer"
@@ -48,7 +48,7 @@ Source: "{#ReleaseDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{autodesktop}\SCAD Render"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\tray\tray-launch.vbs"""; WorkingDir: "{app}\tray"; IconFilename: "{sys}\shell32.dll"; IconIndex: 3; Tasks: desktopicon
-Name: "{group}\Удалить SCAD Renderer"; Filename: "{app}\unins000.exe"; Parameters: "/VERYSILENT"; IconFilename: "{app}\SCADRenderer.exe"; IconIndex: 0
+Name: "{group}\Удалить SCAD Renderer"; Filename: "{app}\unins000.exe"; IconFilename: "{app}\SCADRenderer.exe"; IconIndex: 0
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "install --quiet --target ""{app}"""; StatusMsg: "Регистрация SCAD Renderer..."; Flags: runhidden waituntilterminated
@@ -56,12 +56,18 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "install --quiet --target ""{app}
 [UninstallRun]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "unregister --quiet --target ""{app}"""; RunOnceId: "UnregisterScadRenderer"; Flags: runhidden waituntilterminated
 
+[UninstallDelete]
+Type: dirifempty; Name: "{app}\_internal"
+Type: dirifempty; Name: "{app}\tray"
+Type: dirifempty; Name: "{app}"
+
 [Code]
 var
   ExistingPage: TWizardPage;
   ReinstallRadio: TNewRadioButton;
   RemoveRadio: TNewRadioButton;
   Removing: Boolean;
+  DeleteUserData: Boolean;
   RemovalForm: TSetupForm;
   RemovalText: TNewStaticText;
   RemovalTimer: Longword;
@@ -109,15 +115,17 @@ var
   CloseButton: TNewButton;
 begin
   RemovalSeconds := 10;
-  RemovalForm := CreateCustomForm(ScaleX(440), ScaleY(150), False, True);
+  RemovalForm := CreateCustomForm(ScaleX(320), ScaleY(130), False, True);
   try
+    RemovalForm.ClientWidth := ScaleX(320);
+    RemovalForm.ClientHeight := ScaleY(130);
     RemovalForm.Caption := 'SCAD Renderer';
     RemovalText := TNewStaticText.Create(RemovalForm);
     RemovalText.Parent := RemovalForm;
-    RemovalText.Left := ScaleX(18);
-    RemovalText.Top := ScaleY(20);
-    RemovalText.Width := RemovalForm.ClientWidth - ScaleX(36);
-    RemovalText.Height := ScaleY(70);
+    RemovalText.Left := ScaleX(16);
+    RemovalText.Top := ScaleY(16);
+    RemovalText.Width := RemovalForm.ClientWidth - ScaleX(32);
+    RemovalText.Height := ScaleY(54);
     RemovalText.WordWrap := True;
     RemovalText.Caption := 'SCAD Renderer удалён.' + #13#10 +
       'Окно закроется через 10 сек.';
@@ -125,10 +133,10 @@ begin
     CloseButton := TNewButton.Create(RemovalForm);
     CloseButton.Parent := RemovalForm;
     CloseButton.Caption := 'Закрыть';
-    CloseButton.Width := ScaleX(95);
-    CloseButton.Height := ScaleY(25);
-    CloseButton.Left := RemovalForm.ClientWidth - CloseButton.Width - ScaleX(18);
-    CloseButton.Top := RemovalForm.ClientHeight - CloseButton.Height - ScaleY(16);
+    CloseButton.Width := ScaleX(90);
+    CloseButton.Height := ScaleY(24);
+    CloseButton.Left := RemovalForm.ClientWidth - CloseButton.Width - ScaleX(16);
+    CloseButton.Top := RemovalForm.ClientHeight - CloseButton.Height - ScaleY(14);
     CloseButton.ModalResult := mrOk;
     CloseButton.Default := True;
 
@@ -142,6 +150,107 @@ begin
     end;
     RemovalForm.Free;
     RemovalForm := nil;
+  end;
+end;
+
+function InitializeUninstall(): Boolean;
+var
+  Form: TSetupForm;
+  Note: TNewStaticText;
+  DataCheck: TNewCheckBox;
+  DeleteButton: TNewButton;
+  CancelButton: TNewButton;
+begin
+  DeleteUserData := True;
+  if UninstallSilent then
+  begin
+    Result := True;
+    Exit;
+  end;
+
+  Form := CreateCustomForm(ScaleX(420), ScaleY(185), False, True);
+  try
+    Form.ClientWidth := ScaleX(420);
+    Form.ClientHeight := ScaleY(185);
+    Form.Caption := 'Удаление SCAD Renderer';
+
+    Note := TNewStaticText.Create(Form);
+    Note.Parent := Form;
+    Note.Left := ScaleX(16);
+    Note.Top := ScaleY(14);
+    Note.Width := Form.ClientWidth - ScaleX(32);
+    Note.Height := ScaleY(44);
+    Note.WordWrap := True;
+    Note.Caption := 'Будут удалены настройки, журналы и профиль браузера.' + #13#10 + 'Слоты в slicer-slots сохранятся.';
+
+    DataCheck := TNewCheckBox.Create(Form);
+    DataCheck.Parent := Form;
+    DataCheck.Left := ScaleX(16);
+    DataCheck.Top := ScaleY(66);
+    DataCheck.Width := Form.ClientWidth - ScaleX(32);
+    DataCheck.Height := ScaleY(38);
+    DataCheck.Caption := 'Удалить также настройки, журналы и профиль браузера';
+    DataCheck.Checked := True;
+
+    DeleteButton := TNewButton.Create(Form);
+    DeleteButton.Parent := Form;
+    DeleteButton.Caption := 'Удалить';
+    DeleteButton.Width := ScaleX(95);
+    DeleteButton.Height := ScaleY(25);
+    DeleteButton.Left := Form.ClientWidth - DeleteButton.Width - ScaleX(16);
+    DeleteButton.Top := Form.ClientHeight - DeleteButton.Height - ScaleY(14);
+    DeleteButton.ModalResult := mrOk;
+    DeleteButton.Default := True;
+
+    CancelButton := TNewButton.Create(Form);
+    CancelButton.Parent := Form;
+    CancelButton.Caption := 'Отмена';
+    CancelButton.Width := ScaleX(95);
+    CancelButton.Height := ScaleY(25);
+    CancelButton.Left := DeleteButton.Left - CancelButton.Width - ScaleX(8);
+    CancelButton.Top := DeleteButton.Top;
+    CancelButton.ModalResult := mrCancel;
+    CancelButton.Cancel := True;
+
+    if Form.ShowModal = mrOk then
+    begin
+      DeleteUserData := DataCheck.Checked;
+      Result := True;
+    end
+    else
+      Result := False;
+  finally
+    Form.Free;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    if DeleteUserData then
+    begin
+      DelTree(ExpandConstant('{app}\scad-drop\state'), True, True, True);
+      DelTree(ExpandConstant('{app}\scad-variants\state'), True, True, True);
+      DelTree(ExpandConstant('{app}\tray\state'), True, True, True);
+      RemoveDir(ExpandConstant('{app}\scad-drop'));
+      RemoveDir(ExpandConstant('{app}\scad-variants'));
+      RemoveDir(ExpandConstant('{app}\_internal'));
+      RemoveDir(ExpandConstant('{app}\tray'));
+      { The uninstaller itself still lives in the application folder; remove
+        the empty shell after it has exited. }
+      Exec(
+        ExpandConstant('{cmd}'),
+        '/c ping -n 4 127.0.0.1 >nul & rmdir /s /q "' +
+          ExpandConstant('{app}') + '"',
+        '',
+        SW_HIDE,
+        ewNoWait,
+        ResultCode
+      );
+    end;
   end;
 end;
 

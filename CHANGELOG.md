@@ -27,6 +27,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   misleading “installation not complete” prompt after removal.
 - `[dev.8]` The setup offers a custom install folder and shows a timed
   “removal complete” confirmation after uninstalling.
+- `[dev.9]` Add an uninstall option, enabled by default, to remove settings,
+  logs and the preview browser profile along with the application.
 
 ## [1.2.0] - 2026-11-27
 
