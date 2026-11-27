@@ -9,9 +9,9 @@ Git commit subjects are short labels; this file is the detailed history.
 
 ### Fixed
 
-- The left-click tray menu now opens at the cursor instead of the hidden
-  owner form's off-screen origin. The screen point is converted to owner
-  client coordinates before `Show`.
+- The left-click context menu no longer creates a taskbar button. The popup is
+  marked with `WS_EX_TOOLWINDOW` and `WS_EX_APPWINDOW` is removed on open; the
+  hidden owner form was removed.
 
 ## [1.1.1] - 2026-11-27
 

@@ -906,22 +906,53 @@ namespace ScadTrayWin {
 
 $script:Context = New-Object System.Windows.Forms.ApplicationContext
 
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class ScadTrayWindow
+{
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    public static void HideFromTaskbar(IntPtr hwnd)
+    {
+        const int GWL_EXSTYLE = -20;
+        const int WS_EX_TOOLWINDOW = 0x00000080;
+        const int WS_EX_APPWINDOW = 0x00040000;
+        const uint SWP_NOSIZE = 0x0001;
+        const uint SWP_NOMOVE = 0x0002;
+        const uint SWP_NOZORDER = 0x0004;
+        const uint SWP_NOACTIVATE = 0x0010;
+        const uint SWP_FRAMECHANGED = 0x0020;
+
+        int style = GetWindowLong(hwnd, GWL_EXSTYLE);
+        style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW;
+        SetWindowLong(hwnd, GWL_EXSTYLE, style);
+        SetWindowPos(
+            hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    }
+}
+'@
+
 $script:Menu = New-Object System.Windows.Forms.ContextMenuStrip
 $script:Menu.add_Opening({
     $script:MenuButtonWasDown = [ScadTrayMenuFilter]::IsLeftButtonDown()
     Build-TrayMenu
 })
-
-# Hidden owner form: the menu is owned by it, so Windows does not create a
-# separate taskbar button for the popup shown by a left-click.
-$script:MenuOwner = New-Object System.Windows.Forms.Form
-$script:MenuOwner.ShowInTaskbar = $false
-$script:MenuOwner.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-$script:MenuOwner.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-$script:MenuOwner.Location = New-Object System.Drawing.Point(-32000, -32000)
-$script:MenuOwner.Size = New-Object System.Drawing.Size(1, 1)
-$script:MenuOwner.Opacity = 0
-$script:MenuOwner.Show()
+$script:Menu.add_Opened({
+    try {
+        [ScadTrayWindow]::HideFromTaskbar($script:Menu.Handle)
+    } catch { }
+})
 
 Add-Type -TypeDefinition @'
 using System;
@@ -1008,9 +1039,7 @@ $script:NotifyIcon.ContextMenuStrip = $script:Menu
 $script:NotifyIcon.Visible = $true
 $script:NotifyIcon.add_MouseClick({
     if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-        $screenPoint = [System.Windows.Forms.Cursor]::Position
-        $ownerPoint = $script:MenuOwner.PointToClient($screenPoint)
-        $script:Menu.Show($script:MenuOwner, $ownerPoint)
+        $script:Menu.Show([System.Windows.Forms.Cursor]::Position)
     }
 })
 Update-TrayTooltip
@@ -1042,10 +1071,6 @@ if ($script:MenuTimer) {
 }
 $script:NotifyIcon.Visible = $false
 $script:NotifyIcon.Dispose()
-if ($script:MenuOwner) {
-    $script:MenuOwner.Close()
-    $script:MenuOwner.Dispose()
-}
 $mutex.ReleaseMutex()
 
 if ($script:RestartRequested) {
