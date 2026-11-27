@@ -1,6 +1,6 @@
 # SCAD Renderer
 
-Текущая версия: **1.1.2-dev.10** (`VERSION` 1.1.2, `BUILD` 10) · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
+Текущая версия: **1.1.2-dev.11** (`VERSION` 1.1.2, `BUILD` 11) · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
 
 Локальный рендерер вариантов OpenSCAD для Windows: контекстное меню Проводника,
 галерея результатов, 3D-просмотр, просмотр исходного кода, слоты OrcaSlicer и
@@ -79,6 +79,8 @@ Windows-обвязка:
 - Windows 11;
 - Python 3.10+ с Pillow;
 - OpenSCAD (желательно Manifold-сборка; обычная установка тоже поддерживается);
+  ищется через `OPENSCAD`, рядом с приложением, `PATH`, стандартные папки
+  установки, Scoop или Chocolatey;
 - Microsoft Edge.
 
 На текущей машине используется Python из DeepSeek Harness:

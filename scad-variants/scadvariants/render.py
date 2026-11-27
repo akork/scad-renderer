@@ -4,6 +4,7 @@ import ctypes
 import os
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -81,11 +82,22 @@ def _candidate_paths() -> Iterable[Path]:
     env = os.environ.get("OPENSCAD")
     if env:
         yield Path(env)
-    # Prefer the portable Manifold-capable OpenSCAD snapshot in the workspace.
+
+    # Portable layout: keep OpenSCAD next to the app/launcher if desired.
+    for base in (
+        Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else None,
+        Path(__file__).resolve().parents[2],
+    ):
+        if base is not None:
+            yield base / "openscad" / "openscad.exe"
+            yield base / "openscad.exe"
+
     yield from _nightly_candidates()
+
     exe = shutil.which("openscad")
     if exe:
         yield Path(exe)
+
     for base in (
         os.environ.get("ProgramFiles"),
         os.environ.get("ProgramFiles(x86)"),
@@ -95,6 +107,12 @@ def _candidate_paths() -> Iterable[Path]:
             continue
         yield Path(base) / "OpenSCAD" / "openscad.exe"
         yield Path(base) / "Programs" / "OpenSCAD" / "openscad.exe"
+
+    # Per-user Scoop and machine-wide Chocolatey installs.
+    yield Path.home() / "scoop" / "shims" / "openscad.exe"
+    program_data = os.environ.get("ProgramData")
+    if program_data:
+        yield Path(program_data) / "chocolatey" / "bin" / "openscad.exe"
 
 
 def find_openscad(explicit: str | None = None) -> str:

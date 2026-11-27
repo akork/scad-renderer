@@ -63,7 +63,16 @@ function Normalize-Path([string]$Path) {
 }
 
 function Get-OpenScadPath {
-    # Prefer the portable Manifold-capable snapshot in the workspace.
+    if ($env:OPENSCAD -and (Test-Path -LiteralPath $env:OPENSCAD)) {
+        return $env:OPENSCAD
+    }
+    $portable = @(
+        (Join-Path $script:ProjectRoot 'openscad\openscad.exe'),
+        (Join-Path $script:ProjectRoot 'openscad.exe')
+    )
+    foreach ($candidate in $portable) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
     $tools = Join-Path $script:ProjectRoot 'tools'
     if (Test-Path -LiteralPath $tools) {
         $snapshots = @(
@@ -75,9 +84,18 @@ function Get-OpenScadPath {
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
     }
-    # The scoop shim is a console wrapper and opens a terminal. The
-    # "current" junction also breaks older OpenSCAD builds (boost read_symlink),
-    # so prefer a real versioned GUI executable.
+    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $bases = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)
+    foreach ($base in $bases) {
+        if (-not $base) { continue }
+        foreach ($candidate in @(
+            (Join-Path $base 'OpenSCAD\openscad.exe'),
+            (Join-Path $base 'Programs\OpenSCAD\openscad.exe')
+        )) {
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+    }
     $appsRoot = Join-Path $env:USERPROFILE 'scoop\apps\openscad'
     if (Test-Path -LiteralPath $appsRoot) {
         $versions = @(
@@ -89,21 +107,19 @@ function Get-OpenScadPath {
             $candidate = Join-Path $version.FullName 'openscad.exe'
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
+        $current = Join-Path $appsRoot 'current\openscad.exe'
+        if (Test-Path -LiteralPath $current) { return $current }
     }
-    $current = Join-Path $appsRoot 'current\openscad.exe'
-    if (Test-Path -LiteralPath $current) { return $current }
-    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-    $fallback = 'C:\Users\ak\scoop\shims\openscad.exe'
-    if (Test-Path -LiteralPath $fallback) { return $fallback }
+    $scoopShim = Join-Path $env:USERPROFILE 'scoop\shims\openscad.exe'
+    if (Test-Path -LiteralPath $scoopShim) { return $scoopShim }
+    if ($env:ProgramData) {
+        $choco = Join-Path $env:ProgramData 'chocolatey\bin\openscad.exe'
+        if (Test-Path -LiteralPath $choco) { return $choco }
+    }
     return $null
 }
 
 function Get-OpenScadIconPath {
-    # The scoop shim has a generic console icon; use the real OpenSCAD exe so
-    # the tray icon is the recognizable yellow/green OpenSCAD logo.
-    $actual = 'C:\Users\ak\scoop\apps\openscad\2021.01\openscad.exe'
-    if (Test-Path -LiteralPath $actual) { return $actual }
     return (Get-OpenScadPath)
 }
 

@@ -22,6 +22,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   on disk instead of scanning a fixed Downloads folder.
 - `[dev.10]` Removed the “open in OpenSCAD” action and the local portable
   OpenSCAD copy; rendering uses the installed OpenSCAD CLI.
+- `[dev.11]` OpenSCAD discovery is portable: environment, app-relative,
+  `PATH`, standard install folders, Scoop and Chocolatey.
 
 ## [1.1.2] - 2026-11-27
 
