@@ -2,7 +2,7 @@
 
 - Version source of truth: `VERSION` at the repository root.
 - Local build counter: `BUILD` at the repository root.
-- Current version: `1.1.2-dev.11` (`VERSION` 1.1.2, `BUILD` 11).
+- Current version: `1.1.2-dev.12` (`VERSION` 1.1.2, `BUILD` 12).
 - After each completed local change, increment `BUILD`; display
   `VERSION-dev.BUILD`. Before a release, bump `VERSION`, reset `BUILD` to 0,
   then tag the release.
@@ -14,8 +14,8 @@
 - Renderer entry point is the Explorer context menu:
   `scad_drop.py --render-file <path>`.
 - There is no permanent folder watcher.
-- Generated `state/`, browser profiles, renders, `orca-slots/`,
-  `slicer-slots/` and `tools/` are ignored by Git.
+- Generated `state/`, browser profiles, renders, `orca-slots/` and `tools/` are
+  ignored by Git.
 - Tests:
 
   ```powershell

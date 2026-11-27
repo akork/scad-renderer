@@ -24,6 +24,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   OpenSCAD copy; rendering uses the installed OpenSCAD CLI.
 - `[dev.11]` OpenSCAD discovery is portable: environment, app-relative,
   `PATH`, standard install folders, Scoop and Chocolatey.
+- `[dev.12]` Slots live in the project-local `orca-slots` folder; a frozen
+  executable uses the folder next to the EXE.
 
 ## [1.1.2] - 2026-11-27
 

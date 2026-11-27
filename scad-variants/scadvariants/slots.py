@@ -16,13 +16,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
-WORKSPACE_DIR = PROJECT_DIR.parent
-SLOTS_ROOT = WORKSPACE_DIR / "slicer-slots"
+from .paths import app_root
+
+APP_ROOT = app_root()
+WORKSPACE_DIR = APP_ROOT
+SLOTS_ROOT = APP_ROOT / "orca-slots"
 SLOTS_JSON = SLOTS_ROOT / "slots.json"
 SLOTS_PAGE = SLOTS_ROOT / "index.html"
-LEGACY_ORCA_DIR = WORKSPACE_DIR / "orca-slots"
-LEGACY_ORCA_JSON = LEGACY_ORCA_DIR / "slots.json"
+LEGACY_SLICER_JSON = APP_ROOT / "slicer-slots" / "slots.json"
 # Backward-compatible name for callers that only need the root.
 SLOTS_DIR = SLOTS_ROOT
 
@@ -108,30 +109,55 @@ def _flat_slots(slots: Any) -> dict[str, dict[str, Any]]:
     }
 
 
-def _read_data() -> dict[str, dict[str, dict[str, Any]]]:
-    if SLOTS_JSON.is_file():
-        try:
-            data = json.loads(SLOTS_JSON.read_text(encoding="utf-8-sig"))
-        except (OSError, ValueError):
-            data = {}
-        slots = data.get("slots") if isinstance(data, dict) else None
-        version = data.get("version") if isinstance(data, dict) else 0
-        if isinstance(slots, dict) and int(version or 0) >= 2:
-            return {
+def _normalize_entry_paths(
+    data: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Repair absolute slot paths after the app folder has been moved."""
+    for slicer, bucket in data.items():
+        for entry in bucket.values():
+            raw = str(entry.get("path") or entry.get("file") or "")
+            if raw and Path(raw).is_file():
+                continue
+            name = Path(raw).name
+            if not name:
+                continue
+            candidates = [
+                SLOTS_ROOT / name,
+                SLOTS_ROOT / slicer / name,
+            ]
+            for candidate in candidates:
+                if candidate.is_file():
+                    entry["path"] = str(candidate)
+                    entry["file"] = candidate.name
+                    break
+    return data
+
+
+def _read_payload(data: Any) -> dict[str, dict[str, dict[str, Any]]]:
+    if not isinstance(data, dict):
+        return {}
+    slots = data.get("slots")
+    version = int(data.get("version") or 0)
+    if isinstance(slots, dict) and version >= 2:
+        return _normalize_entry_paths(
+            {
                 valid_slicer(slicer): _flat_slots(bucket)
                 for slicer, bucket in slots.items()
                 if isinstance(bucket, dict)
             }
-        return {"orca": _flat_slots(slots)}
+        )
+    return _normalize_entry_paths({"orca": _flat_slots(slots)})
 
-    if LEGACY_ORCA_JSON.is_file():
+
+def _read_data() -> dict[str, dict[str, dict[str, Any]]]:
+    for path in (SLOTS_JSON, LEGACY_SLICER_JSON):
+        if not path.is_file():
+            continue
         try:
-            data = json.loads(LEGACY_ORCA_JSON.read_text(encoding="utf-8-sig"))
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
-            data = {}
-        slots = data.get("slots") if isinstance(data, dict) else None
-        return {"orca": _flat_slots(slots)}
-
+            continue
+        return _read_payload(data)
     return {}
 
 
