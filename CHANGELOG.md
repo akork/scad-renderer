@@ -12,6 +12,8 @@ follows Keep a Changelog and the project uses semantic versioning.
 
 - Tray **Сервис** submenu with restart, local changelog and GitHub repository
   actions.
+- The changelog action opens a rendered local preview in the browser, including
+  changes that have not been pushed yet.
 
 ## [1.1.2] - 2026-11-27
 

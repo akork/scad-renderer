@@ -572,6 +572,117 @@ function Exit-Tray {
     }
 }
 
+function Open-ChangelogPreview {
+    $root = Split-Path -Parent $script:ScadRoot
+    $source = Join-Path $root 'CHANGELOG.md'
+    if (-not (Test-Path -LiteralPath $source)) {
+        Write-TrayLog "changelog missing: $source"
+        return
+    }
+
+    $marked = Join-Path $PSScriptRoot 'vendor\marked.min.js'
+    if (-not (Test-Path -LiteralPath $marked)) {
+        Start-Process -FilePath $source | Out-Null
+        Write-TrayLog "changelog renderer missing; opened source: $source"
+        return
+    }
+
+    try {
+        $markdown = [IO.File]::ReadAllText($source, [Text.Encoding]::UTF8)
+        $encoded = [System.Net.WebUtility]::HtmlEncode($markdown)
+        $markedUri = ([Uri]$marked).AbsoluteUri
+        $template = @'
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>SCAD Render — история изменений</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    background: #f6f8fa;
+    color: #1f2328;
+    font: 16px/1.55 "Segoe UI", Arial, sans-serif;
+  }
+  main {
+    max-width: 980px;
+    margin: 40px auto 80px;
+    padding: 40px 48px;
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(140, 149, 159, .12);
+  }
+  h1, h2, h3, h4 { line-height: 1.25; margin: 1.4em 0 .55em; }
+  h1 { font-size: 2em; border-bottom: 1px solid #d8dee4; padding-bottom: .3em; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid #d8dee4; padding-bottom: .3em; }
+  h3 { font-size: 1.2em; }
+  p, ul, ol { margin: .7em 0; }
+  li { margin: .25em 0; }
+  code {
+    font: 85%/1.45 Consolas, "Cascadia Mono", monospace;
+    background: #eff1f3;
+    border-radius: 4px;
+    padding: .15em .35em;
+  }
+  pre {
+    background: #f6f8fa;
+    border: 1px solid #d8dee4;
+    border-radius: 6px;
+    padding: 14px;
+    overflow: auto;
+  }
+  pre code { background: transparent; padding: 0; }
+  a { color: #0969da; }
+  hr { border: 0; border-top: 1px solid #d8dee4; margin: 1.8em 0; }
+  blockquote {
+    margin: 1em 0;
+    padding: .3em 1em;
+    color: #59636e;
+    border-left: 4px solid #d0d7de;
+  }
+  table { border-collapse: collapse; margin: 1em 0; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 12px; }
+  th { background: #f6f8fa; }
+  img { max-width: 100%; }
+  .meta { color: #59636e; font-size: 13px; border-top: 1px solid #d8dee4; padding-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="content"><p>Загрузка…</p></div>
+  <p class="meta">Локальный <code>CHANGELOG.md</code>, включая ещё не запушенные изменения.</p>
+</main>
+<script src="__MARKED__"></script>
+<script id="markdown-source" type="text/plain">__SOURCE__</script>
+<script>
+  const source = document.getElementById('markdown-source').textContent;
+  const content = document.getElementById('content');
+  if (window.marked) {
+    content.innerHTML = marked.parse(source);
+    document.querySelectorAll('#content a').forEach(function (link) {
+      link.target = '_blank';
+      link.rel = 'noopener';
+    });
+  } else {
+    content.textContent = source;
+  }
+</script>
+</body>
+</html>
+'@
+        $html = $template.Replace('__MARKED__', $markedUri).Replace('__SOURCE__', $encoded)
+        $htmlPath = Join-Path $script:StateDir 'changelog.html'
+        [IO.File]::WriteAllText($htmlPath, $html, [Text.UTF8Encoding]::new($false))
+        Start-Process -FilePath $htmlPath | Out-Null
+        Write-TrayLog "open changelog preview: $htmlPath"
+    } catch {
+        Write-TrayLog "changelog preview failed: $($_.Exception.Message)"
+        try { Start-Process -FilePath $source | Out-Null } catch { }
+    }
+}
+
 function Restart-Tray {
     Write-TrayLog 'restart requested'
     $script:RestartRequested = $true
@@ -844,24 +955,7 @@ function Build-TrayMenu {
 
         $history = New-Object System.Windows.Forms.ToolStripMenuItem
         $history.Text = 'Открыть историю изменений'
-        $history.add_Click({
-            $historyPath = Join-Path (Split-Path -Parent $script:ScadRoot) 'CHANGELOG.md'
-            if (-not (Test-Path -LiteralPath $historyPath)) {
-                Write-TrayLog "changelog missing: $historyPath"
-                return
-            }
-            try {
-                Start-Process -FilePath $historyPath | Out-Null
-                Write-TrayLog "open changelog: $historyPath"
-            } catch {
-                try {
-                    Start-Process -FilePath 'notepad.exe' -ArgumentList ('"' + $historyPath + '"') | Out-Null
-                    Write-TrayLog "open changelog in notepad: $historyPath"
-                } catch {
-                    Write-TrayLog "changelog open failed: $($_.Exception.Message)"
-                }
-            }
-        })
+        $history.add_Click({ Open-ChangelogPreview })
         [void]$service.DropDownItems.Add($history)
 
         $github = New-Object System.Windows.Forms.ToolStripMenuItem
