@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import json
 import logging
 import os
 import shutil
@@ -17,6 +18,7 @@ import subprocess
 import sys
 import time
 import uuid
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -111,6 +113,34 @@ def show_error(message: str) -> None:
         pass
 
 
+def _record_recent(index: Path, source: Path, state_root: Path) -> None:
+    """Remember the last context-menu render for the tray, anywhere on disk."""
+    path = state_root / "recent.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        payload = {}
+    items = payload.get("items") if isinstance(payload, dict) else None
+    entries = [item for item in (items or []) if isinstance(item, dict)]
+    index_text = str(index)
+    entry = {
+        "index": index_text,
+        "source": str(source),
+        "name": source.stem,
+        "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    entries = [entry] + [
+        item for item in entries if str(item.get("index") or "") != index_text
+    ]
+    state_root.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
+    tmp.write_text(
+        json.dumps({"version": 1, "items": entries[:16]}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    os.replace(tmp, path)
+
+
 def open_gallery(index: Path) -> None:
     try:
         variants_dir = str(WORKSPACE_DIR / "scad-variants")
@@ -141,6 +171,7 @@ def render_one_file(
     renderer_state: Path,
     timeout: float,
     open_result: bool = True,
+    recent_state: Path = DEFAULT_STATE,
 ) -> int:
     """Render one .scad file in place (Explorer context-menu mode)."""
     source = Path(source).expanduser().resolve()
@@ -201,6 +232,7 @@ def render_one_file(
         return 1
 
     LOG.info("context gallery ready: %s", index)
+    _record_recent(index, source, recent_state)
     if open_result:
         open_gallery(index)
     return 0
@@ -264,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         args.renderer_state,
         args.render_timeout,
         open_result=args.open,
+        recent_state=args.state,
     )
 
 

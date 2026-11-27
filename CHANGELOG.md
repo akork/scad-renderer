@@ -18,6 +18,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   can use independent stable slots.
 - `[dev.8]` Rendering always writes results next to the source file; fixed
   `SCAD` and `deliverables` folders are no longer used.
+- `[dev.9]` The tray recent-render list follows context-menu renders anywhere
+  on disk instead of scanning a fixed Downloads folder.
 
 ## [1.1.2] - 2026-11-27
 

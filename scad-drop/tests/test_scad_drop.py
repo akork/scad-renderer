@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_DIR))
 
-from scad_drop import _build_parser, _glob_exact, gallery_dir  # noqa: E402
+from scad_drop import _build_parser, _glob_exact, _record_recent, gallery_dir  # noqa: E402
 
 
 class HelperTests(unittest.TestCase):
@@ -35,6 +37,18 @@ class HelperTests(unittest.TestCase):
             parser.parse_args([])
         args = parser.parse_args(["--render-file", "C:/models/part.scad"])
         self.assertEqual(args.render_file, "C:/models/part.scad")
+
+    def test_recent_registry_records_external_render(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index = root / "part_renders" / "index.html"
+            index.parent.mkdir()
+            index.write_text("gallery", encoding="utf-8")
+            state = root / "state"
+            _record_recent(index, root / "part.scad", state)
+            payload = json.loads((state / "recent.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["items"][0]["index"], str(index))
+            self.assertEqual(payload["items"][0]["name"], "part")
 
 
 if __name__ == "__main__":

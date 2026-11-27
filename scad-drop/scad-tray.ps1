@@ -1,5 +1,4 @@
 ﻿param(
-    [string]$Downloads = '',
     [string]$StateDir = '',
     [string]$InstanceName = 'ScadDropTray',
     [int]$StartDelay = 0,
@@ -13,12 +12,10 @@ if ($StartDelay -gt 0) {
 }
 
 $ErrorActionPreference = 'Stop'
-if (-not $Downloads) { $Downloads = Join-Path $env:USERPROFILE 'Downloads' }
 if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:Downloads = [IO.Path]::GetFullPath($Downloads)
 $script:ProjectRoot = Split-Path -Parent $PSScriptRoot
 $script:StateDir = [IO.Path]::GetFullPath($StateDir)
 $workspaceRoot = $script:ProjectRoot
@@ -205,48 +202,34 @@ public static class ScadFolderMenuIcon
 }
 
 function Get-RecentRenders {
-    if (-not (Test-Path -LiteralPath $script:Downloads)) { return @() }
+    $recentPath = Join-Path $script:StateDir 'recent.json'
+    if (-not (Test-Path -LiteralPath $recentPath)) { return @() }
+    try {
+        $payload = Get-Content -LiteralPath $recentPath -Raw | ConvertFrom-Json
+    } catch {
+        return @()
+    }
     $items = @()
-    $manifests = @(
-        Get-ChildItem -LiteralPath $script:Downloads -File -Filter 'manifest.json' `
-            -Recurse -ErrorAction SilentlyContinue
-    )
-    foreach ($manifest in $manifests) {
-        $folder = $manifest.Directory
-        if (-not $folder) { continue }
-        $index = Join-Path $folder.FullName 'index.html'
-        if (-not (Test-Path -LiteralPath $index)) { continue }
-        try {
-            $data = Get-Content -LiteralPath $manifest.FullName -Raw | ConvertFrom-Json
-        } catch {
-            continue
-        }
-        if ($null -eq $data -or -not $data.source) { continue }
-
-        $rawTime = [string]$data.updated_at
+    foreach ($entry in @($payload.items)) {
+        if ($null -eq $entry) { continue }
+        $index = [string]$entry.index
+        if (-not $index -or -not (Test-Path -LiteralPath $index)) { continue }
+        $folder = Split-Path -Parent $index
         $when = [datetime]::MinValue
-        if (-not [datetime]::TryParse(
-                $rawTime,
-                [Globalization.CultureInfo]::InvariantCulture,
-                [Globalization.DateTimeStyles]::RoundtripKind,
-                [ref]$when)) {
-            $when = $manifest.LastWriteTime
-        }
-
-        $base = $folder.Name
-        if ($base -like '*_renders') {
-            $name = $base.Substring(0, $base.Length - 8)
-        } else {
-            $name = [IO.Path]::GetFileNameWithoutExtension([string]$data.source.rel)
-        }
-        if (-not $name) { $name = $base }
-
+        [void][datetime]::TryParse(
+            [string]$entry.updated_at,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind,
+            [ref]$when)
+        if ($when -eq [datetime]::MinValue) { $when = (Get-Item -LiteralPath $index).LastWriteTime }
+        $name = [string]$entry.name
+        if (-not $name) { $name = [IO.Path]::GetFileName($folder) }
         $items += [pscustomobject]@{
             Name = $name
             When = $when
             Date = $when.ToString('dd.MM.yyyy')
             Time = $when.ToString('HH:mm')
-            Folder = $folder.FullName
+            Folder = $folder
             Index = $index
         }
     }
