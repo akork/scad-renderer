@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Downloads = '',
     [string]$ScadRoot = '',
     [string]$StateDir = '',
