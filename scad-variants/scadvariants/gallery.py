@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from .slots import SLOTS_PAGE, load_slots, write_slots_page
+from .slots import SLICER_LABELS, SLOTS_PAGE, load_all_slots, write_slots_page
 
 try:
     from zoneinfo import ZoneInfo
@@ -177,6 +177,7 @@ body.code-mode #source-panel {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .slot-pill:hover { border-color: #94a3b8; }
+.slot-pill[hidden] { display: none; }
 .slot-pill.active { border-color: #0f766e; background: #0f766e; color: #fff; }
 .slot-more {
   width: 30px; height: 30px; margin-left: auto; border: 1px solid #cbd5e1;
@@ -524,7 +525,11 @@ function openSlotDialog(button) {{
   const list = document.getElementById('slot-dialog-list');
   const current = box.querySelector('.slot-value')?.value || '';
   list.innerHTML = '';
-  const names = (box.dataset.allSlots || '').split('|').filter(Boolean);
+  const card = box.closest('.variant-card');
+  const slicer = card ? (card.querySelector('.slicer-value')?.value || 'orca') : 'orca';
+  const names = Array.from(box.querySelectorAll('.slot-pill'))
+    .filter((pill) => pill.dataset.slicer === slicer)
+    .map((pill) => pill.dataset.slot);
   names.forEach((name) => {{
     const item = document.createElement('button');
     item.type = 'button';
@@ -694,6 +699,37 @@ document.addEventListener('keydown', (event) => {{
   }}
 }});
 
+function setSlotSlicer(box, name) {{
+  if (!box) return;
+  const pills = Array.from(box.querySelectorAll('.slot-pill'));
+  pills.forEach((pill) => {{
+    const matches = pill.dataset.slicer === name;
+    pill.hidden = !matches;
+    pill.classList.remove('active');
+  }});
+  const names = pills.filter((pill) => pill.dataset.slicer === name).map((pill) => pill.dataset.slot);
+  const value = box.querySelector('.slot-value');
+  const first = names.length ? names[0] : '';
+  if (value) value.value = first;
+  if (first) {{
+    const active = pills.find((pill) => pill.dataset.slicer === name && pill.dataset.slot === first);
+    if (active) active.classList.add('active');
+  }}
+  const empty = box.querySelector('.slot-empty');
+  if (empty) empty.hidden = names.length > 0;
+  const more = box.querySelector('.slot-more');
+  if (!more) return;
+  if (first) {{
+    more.textContent = '⋯';
+    more.classList.remove('active');
+    more.title = 'Другой слот';
+  }} else {{
+    more.textContent = '⋯';
+    more.classList.remove('active');
+    more.title = 'Слотов пока нет';
+  }}
+}}
+
 function setSlicer(box, name) {{
   if (!box) return;
   const value = box.querySelector('.slicer-value');
@@ -701,17 +737,16 @@ function setSlicer(box, name) {{
   box.querySelectorAll('.slicer-pill').forEach((pill) => {{
     pill.classList.toggle('active', pill.dataset.slicer === name);
   }});
+  const card = box.closest('.variant-card');
+  const slotBox = card ? card.querySelector('.slot-box') : null;
+  if (slotBox) setSlotSlicer(slotBox, name);
 }}
 
 function openSlicer(button) {{
   const box = button.closest('.slicer-box');
   const value = box ? box.querySelector('.slicer-value') : null;
   const name = value ? value.value : 'orca';
-  if (name === 'bambu') {{
-    showCopyToast('Bambu Lab: пока заглушка, слайсер не подключён');
-    return;
-  }}
-  window.location.href = 'scad-slicer://open?name=orca';
+  window.location.href = 'scad-slicer://open?name=' + encodeURIComponent(name);
 }}
 
 let scadSourceText = null;
@@ -863,8 +898,11 @@ function assignSlot(button) {{  const box = button.closest('.slot-box');
   }}
   const stl = button.dataset.stl || '';
   if (!stl) return;
+  const card = button.closest('.variant-card');
+  const slicer = card ? (card.querySelector('.slicer-value')?.value || 'orca') : 'orca';
   window.location.href = 'scad-slot://assign?slot=' +
-    encodeURIComponent(slot) + '&stl=' + encodeURIComponent(stl);
+    encodeURIComponent(slot) + '&stl=' + encodeURIComponent(stl) +
+    '&slicer=' + encodeURIComponent(slicer);
 }}
 
 const slotDialog = document.getElementById('slot-dialog');
@@ -927,7 +965,7 @@ def _image_exists(source_dir: Path, variant: dict[str, Any]) -> bool:
 def _variant_card(
     source_dir: Path,
     variant: dict[str, Any],
-    slots: list[str] | None = None,
+    slots_by_slicer: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     label = variant.get("label") or "по умолчанию"
     stamp = variant.get("rendered_at") or ""
@@ -971,26 +1009,34 @@ def _variant_card(
             f'data-path="{_e(str((source_dir / stl).resolve()))}" '
             f'onclick="copyText(this.dataset.path)">Скопировать полный путь к STL</button>'
         )
+    slots_by_slicer = slots_by_slicer or {}
+    default_slicer = next(
+        (slicer for slicer in SLICER_LABELS if slots_by_slicer.get(slicer)),
+        "orca",
+    )
+    default_slot = next(iter(slots_by_slicer.get(default_slicer, {})), "")
     slot_box = ""
     if stl and (source_dir / stl).is_file():
-        slot_names = list(slots or [])
-        first_slots = slot_names[:3]
-        pills = "".join(
-            f'<button type="button" class="slot-pill{" active" if index == 0 else ""}" '
-            f'data-slot="{_e(name)}" '
-            f'onclick="selectSlot(this.closest(\'.slot-box\'), this.dataset.slot)">'
-            f'{_e(name)}</button>'
-            for index, name in enumerate(first_slots)
+        pill_parts: list[str] = []
+        for slicer, label in SLICER_LABELS.items():
+            for name in slots_by_slicer.get(slicer, {}):
+                active = slicer == default_slicer and name == default_slot
+                hidden = "" if slicer == default_slicer else " hidden"
+                pill_parts.append(
+                    f'<button type="button" class="slot-pill{" active" if active else ""}" '
+                    f'data-slicer="{_e(slicer)}" data-slot="{_e(name)}"{hidden} '
+                    f'onclick="selectSlot(this.closest(\'.slot-box\'), this.dataset.slot)">'
+                    f'{_e(name)}</button>'
+                )
+        pills = "".join(pill_parts)
+        empty = (
+            '<span class="slot-empty">Слотов пока нет</span>'
+            if not pills
+            else '<span class="slot-empty" hidden>Слотов пока нет</span>'
         )
-        if not pills:
-            pills = '<span class="slot-empty">Слотов пока нет</span>'
-        all_slots = "|".join(slot_names)
-        first_joined = "|".join(first_slots)
-        default_slot = first_slots[0] if first_slots else ""
         slot_box = (
-            f'<div class="slot-box" data-all-slots="{_e(all_slots)}" '
-            f'data-first-slots="{_e(first_joined)}">'
-            f'<div class="slot-pills">{pills}'
+            f'<div class="slot-box" data-default-slot="{_e(default_slot)}">'
+            f'<div class="slot-pills">{pills}{empty}'
             f'<button type="button" class="slot-more" title="Другой слот" '
             f'onclick="openSlotDialog(this)">⋯</button>'
             f'<input type="hidden" class="slot-value" value="{_e(default_slot)}">'
@@ -1000,14 +1046,17 @@ def _variant_card(
             f'onclick="assignSlot(this)">Отправить в слот</button>'
             '</div>'
         )
+    slicer_parts = "".join(
+        f'<button type="button" class="slicer-pill{" active" if slicer == default_slicer else ""}" '
+        f'data-slicer="{_e(slicer)}" '
+        f'onclick="setSlicer(this.closest(\'.slicer-box\'), \'{_e(slicer)}\')">'
+        f'{_e(label)}</button>'
+        for slicer, label in SLICER_LABELS.items()
+    )
     slicer_box = (
         '<div class="slicer-box">'
-        '<div class="slicer-pills">'
-        '<button type="button" class="slicer-pill active" data-slicer="orca" '
-        'onclick="setSlicer(this.closest(\'.slicer-box\'), \'orca\')">OrcaSlicer</button>'
-        '<button type="button" class="slicer-pill" data-slicer="bambu" '
-        'onclick="setSlicer(this.closest(\'.slicer-box\'), \'bambu\')">Bambu Lab</button>'
-        '<input type="hidden" class="slicer-value" value="orca">'
+        f'<div class="slicer-pills">{slicer_parts}'
+        f'<input type="hidden" class="slicer-value" value="{_e(default_slicer)}">'
         '</div>'
         '<button type="button" class="open-slicer" '
         'onclick="openSlicer(this)">Открыть слайсер</button>'
@@ -1096,9 +1145,9 @@ def write_source_page(
         )
 
     write_slots_page()
-    slot_names = sorted(load_slots(), key=str.casefold)
+    slots_by_slicer = load_all_slots()
     cards = "".join(
-        _variant_card(source_dir, v, slot_names) for v in variants
+        _variant_card(source_dir, v, slots_by_slicer) for v in variants
     )
     if not cards:
         cards = '<div class="empty">Вариантов пока нет.</div>'
@@ -1128,7 +1177,7 @@ def write_source_page(
     folder_actions = (
         f'<a id="slots-link" class="btn" style="border-color:#0f766e;color:#0f766e" '
         f'href="{_e(SLOTS_PAGE.resolve().as_uri())}" target="_blank" '
-        f'rel="noopener">Слоты Orca</a>'
+        f'rel="noopener">Слоты слайсеров</a>'
         f'<a class="btn" style="border-color:#0f766e;color:#0f766e" '
         f'href="{_e(folder_uri)}" target="_blank" rel="noopener">Открыть папку</a>'
         + _copy_button("Копировать папку", folder_abs)

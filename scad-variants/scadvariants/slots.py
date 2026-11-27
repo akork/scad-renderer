@@ -1,8 +1,8 @@
-"""Stable Orca slots.
+"""Stable slot files for supported slicers.
 
-An Orca object can be loaded once from a slot file and then reloaded from disk
-when the slot is assigned a new STL.  Each slot has its own stable path, so a
-plate with several different objects simply uses several slots.
+A slot is a stable file path that a slicer can load once and then reload when
+the slot is updated. Slots are namespaced by slicer id, so OrcaSlicer and
+Bambu Studio can keep independent sets without interfering.
 """
 
 from __future__ import annotations
@@ -15,15 +15,24 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 WORKSPACE_DIR = PROJECT_DIR.parent
-SLOTS_DIR = WORKSPACE_DIR / "orca-slots"
-SLOTS_JSON = SLOTS_DIR / "slots.json"
-SLOTS_PAGE = SLOTS_DIR / "index.html"
+SLOTS_ROOT = WORKSPACE_DIR / "slicer-slots"
+SLOTS_JSON = SLOTS_ROOT / "slots.json"
+SLOTS_PAGE = SLOTS_ROOT / "index.html"
+LEGACY_ORCA_DIR = WORKSPACE_DIR / "orca-slots"
+LEGACY_ORCA_JSON = LEGACY_ORCA_DIR / "slots.json"
+# Backward-compatible name for callers that only need the root.
+SLOTS_DIR = SLOTS_ROOT
 
+SLICER_LABELS = {
+    "orca": "OrcaSlicer",
+    "bambu": "Bambu Studio",
+}
+SLICER_ORDER = tuple(SLICER_LABELS)
 SLOT_NAME_RE = re.compile(r'^[^<>:"/\\|?*\x00-\x1f]{1,40}$')
+SLICER_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,23}$")
 RESERVED_NAMES = {
     "CON",
     "PRN",
@@ -52,6 +61,17 @@ def _format_dt(value: Any) -> str:
         return str(value or "")
 
 
+def valid_slicer(slicer: str) -> str:
+    value = str(slicer or "orca").strip().lower()
+    if not SLICER_ID_RE.fullmatch(value):
+        raise ValueError("Недопустимый идентификатор слайсера")
+    return value
+
+
+def slicer_label(slicer: str) -> str:
+    return SLICER_LABELS.get(slicer, slicer)
+
+
 def allowed_path(path: Path) -> bool:
     roots = [
         (Path.home() / "Downloads").resolve(),
@@ -72,16 +92,15 @@ def validate_name(name: str) -> str:
     return name
 
 
-def slot_file(name: str) -> Path:
-    return SLOTS_DIR / f"{name}.stl"
+def slicer_dir(slicer: str) -> Path:
+    return SLOTS_ROOT / valid_slicer(slicer)
 
 
-def load_slots() -> dict[str, dict[str, Any]]:
-    try:
-        data = json.loads(SLOTS_JSON.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        return {}
-    slots = data.get("slots") if isinstance(data, dict) else None
+def slot_file(name: str, slicer: str = "orca") -> Path:
+    return slicer_dir(slicer) / f"{validate_name(name)}.stl"
+
+
+def _flat_slots(slots: Any) -> dict[str, dict[str, Any]]:
     return {
         str(name): value
         for name, value in (slots or {}).items()
@@ -89,9 +108,44 @@ def load_slots() -> dict[str, dict[str, Any]]:
     }
 
 
-def _save_slots(slots: dict[str, dict[str, Any]]) -> None:
-    SLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {"version": 1, "slots": slots}
+def _read_data() -> dict[str, dict[str, dict[str, Any]]]:
+    if SLOTS_JSON.is_file():
+        try:
+            data = json.loads(SLOTS_JSON.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            data = {}
+        slots = data.get("slots") if isinstance(data, dict) else None
+        version = data.get("version") if isinstance(data, dict) else 0
+        if isinstance(slots, dict) and int(version or 0) >= 2:
+            return {
+                valid_slicer(slicer): _flat_slots(bucket)
+                for slicer, bucket in slots.items()
+                if isinstance(bucket, dict)
+            }
+        return {"orca": _flat_slots(slots)}
+
+    if LEGACY_ORCA_JSON.is_file():
+        try:
+            data = json.loads(LEGACY_ORCA_JSON.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            data = {}
+        slots = data.get("slots") if isinstance(data, dict) else None
+        return {"orca": _flat_slots(slots)}
+
+    return {}
+
+
+def load_all_slots() -> dict[str, dict[str, dict[str, Any]]]:
+    return _read_data()
+
+
+def load_slots(slicer: str = "orca") -> dict[str, dict[str, Any]]:
+    return dict(_read_data().get(valid_slicer(slicer), {}))
+
+
+def _save_data(data: dict[str, dict[str, dict[str, Any]]]) -> None:
+    SLOTS_ROOT.mkdir(parents=True, exist_ok=True)
+    payload = {"version": 2, "slots": data}
     tmp = SLOTS_JSON.with_name(f".{SLOTS_JSON.name}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, SLOTS_JSON)
@@ -102,8 +156,6 @@ def _refresh_gallery(source_dir: Path) -> None:
         manifest_path = source_dir / "manifest.json"
         if not manifest_path.is_file():
             return
-        import json
-
         from .gallery import write_source_page
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -117,8 +169,9 @@ def _refresh_gallery(source_dir: Path) -> None:
         pass
 
 
-def assign_slot(name: str, stl: Path) -> Path:
-    """Copy an STL to a stable slot path and update the slot registry."""
+def assign_slot(name: str, stl: Path, slicer: str = "orca") -> Path:
+    """Copy an STL to a stable per-slicer slot path and update the registry."""
+    slicer = valid_slicer(slicer)
     name = validate_name(name)
     stl = Path(stl).expanduser().resolve()
     if stl.suffix.lower() != ".stl" or not stl.is_file():
@@ -126,25 +179,27 @@ def assign_slot(name: str, stl: Path) -> Path:
     if not allowed_path(stl):
         raise ValueError(f"STL вне разрешённых папок: {stl}")
 
-    SLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    target = slot_file(name)
-    temp = SLOTS_DIR / f".{name}.{uuid.uuid4().hex[:8]}.tmp"
+    target_dir = slicer_dir(slicer)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = slot_file(name, slicer)
+    temp = target_dir / f".{name}.{uuid.uuid4().hex[:8]}.tmp"
     try:
         shutil.copy2(stl, temp)
         os.replace(temp, target)
     finally:
         temp.unlink(missing_ok=True)
 
-    slots = load_slots()
-    slots[name] = {
+    data = _read_data()
+    data.setdefault(slicer, {})[name] = {
         "name": name,
+        "slicer": slicer,
         "file": target.name,
         "path": str(target),
         "source_stl": str(stl),
         "source_dir": str(stl.parent),
         "updated_at": _now(),
     }
-    _save_slots(slots)
+    _save_data(data)
     write_slots_page()
     # Rebuild the gallery the STL came from so the new slot appears in its
     # selector without waiting for the next render.
@@ -152,18 +207,20 @@ def assign_slot(name: str, stl: Path) -> Path:
     return target
 
 
-def delete_slot(name: str) -> Path:
+def delete_slot(name: str, slicer: str = "orca") -> Path:
     """Delete a slot file and its registry entry."""
+    slicer = valid_slicer(slicer)
     name = validate_name(name)
-    slots = load_slots()
-    item = slots.pop(name, None)
+    data = _read_data()
+    bucket = data.get(slicer, {})
+    item = bucket.pop(name, None)
     if item is None:
-        raise ValueError(f"Слот не найден: {name}")
-    path = Path(str(item.get("path") or slot_file(name)))
+        raise ValueError(f"Слот не найден: {slicer}/{name}")
+    path = Path(str(item.get("path") or slot_file(name, slicer)))
     source_dir = Path(str(item.get("source_dir") or ""))
     if path.is_file():
         path.unlink()
-    _save_slots(slots)
+    _save_data(data)
     write_slots_page()
     if source_dir.is_dir():
         _refresh_gallery(source_dir)
@@ -171,28 +228,32 @@ def delete_slot(name: str) -> Path:
 
 
 def write_slots_page() -> None:
-    slots = load_slots()
+    data = load_all_slots()
     rows: list[str] = []
-    for name in sorted(slots, key=str.casefold):
-        item = slots[name]
-        path = str(item.get("path") or slot_file(name))
-        source = str(item.get("source_stl") or "")
-        rows.append(
-            f'<tr><td><b>{_e(name)}</b></td>'
-            f'<td><div class="path">{_e(path)}</div>'
-            f'<div class="src">{_e(source)}</div></td>'
-            f'<td class="nowrap">{_e(_format_dt(item.get("updated_at")))}</td>'
-            f'<td><div class="actions">'
-            f'<button type="button" class="copy" '
-            f'data-path="{_e(path)}" onclick="copyText(this.dataset.path)">'
-            f'Скопировать путь</button>'
-            f'<button type="button" class="del" data-slot="{_e(name)}" '
-            f'onclick="deleteSlot(this.dataset.slot)">Удалить</button>'
-            f'</div></td></tr>'
-        )
+    for slicer in sorted(data, key=lambda value: (SLICER_ORDER.index(value) if value in SLICER_ORDER else 99, value)):
+        bucket = data[slicer]
+        for name in sorted(bucket, key=str.casefold):
+            item = bucket[name]
+            path = str(item.get("path") or slot_file(name, slicer))
+            source = str(item.get("source_stl") or "")
+            rows.append(
+                f'<tr><td><b>{_e(slicer_label(slicer))}</b></td>'
+                f'<td><b>{_e(name)}</b></td>'
+                f'<td><div class="path">{_e(path)}</div>'
+                f'<div class="src">{_e(source)}</div></td>'
+                f'<td class="nowrap">{_e(_format_dt(item.get("updated_at")))}</td>'
+                f'<td><div class="actions">'
+                f'<button type="button" class="copy" '
+                f'data-path="{_e(path)}" onclick="copyText(this.dataset.path)">'
+                f'Скопировать путь</button>'
+                f'<button type="button" class="del" data-slot="{_e(name)}" '
+                f'data-slicer="{_e(slicer)}" '
+                f'onclick="deleteSlot(this.dataset.slicer, this.dataset.slot)">Удалить</button>'
+                f'</div></td></tr>'
+            )
     table = (
-        '<table><thead><tr><th>Слот</th><th>Файл</th><th>Обновлён</th>'
-        '<th></th></tr></thead><tbody>'
+        '<table><thead><tr><th>Слайсер</th><th>Слот</th><th>Файл</th>'
+        '<th>Обновлён</th><th></th></tr></thead><tbody>'
         + "".join(rows)
         + "</tbody></table>"
         if rows
@@ -202,7 +263,7 @@ def write_slots_page() -> None:
     html = f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Слоты Orca</title>
+<title>Слоты слайсеров</title>
 <style>
 :root {{ --line:#e2e8f0; --muted:#64748b; --accent:#0f766e; }}
 * {{ box-sizing:border-box; }}
@@ -227,9 +288,10 @@ tr:last-child td {{ border-bottom:0; }}
 #toast {{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff; padding:10px 14px; border-radius:9px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .15s; }}
 #toast.show {{ opacity:1; }}
 </style></head><body><div class="wrap">
-<h1>Слоты Orca</h1>
-<div class="sub">Один слот = один стабильный STL. Загрузи его в объект Orca один раз;
-после обновления слота выбери в Orca <b>Reload from disk</b>.<br>
+<h1>Слоты слайсеров</h1>
+<div class="sub">Один слот = один стабильный STL для выбранного слайсера.
+OrcaSlicer перечитывает файл через <b>Reload from disk</b>; Bambu Studio
+требует ручного импорта STL из папки слота.<br>
 Для нескольких объектов на столе используй несколько слотов.</div>
 <div class="panel">{table}</div>
 <div id="toast"></div>
@@ -252,12 +314,13 @@ function fallback(path,done) {{
     document.body.appendChild(a); a.select(); const ok=document.execCommand('copy'); a.remove(); done(ok);
   }} catch(e) {{ done(false); }}
 }}
-function deleteSlot(name) {{
-  if (!confirm('Удалить слот «' + name + '»? Объект в Orca потеряет источник для Reload.')) return;
-  window.location.href = 'scad-slot://delete?slot=' + encodeURIComponent(name);
+function deleteSlot(slicer, name) {{
+  if (!confirm('Удалить слот «' + name + '» для ' + slicer + '?')) return;
+  window.location.href = 'scad-slot://delete?slot=' + encodeURIComponent(name) +
+    '&slicer=' + encodeURIComponent(slicer);
 }}
 </script></body></html>"""
-    SLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    SLOTS_ROOT.mkdir(parents=True, exist_ok=True)
     tmp = SLOTS_PAGE.with_name(f".{SLOTS_PAGE.name}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(html, encoding="utf-8")
     os.replace(tmp, SLOTS_PAGE)

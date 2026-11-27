@@ -14,6 +14,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   repository actions.
 - `[dev.3]` The changelog action opens a rendered local preview in the browser,
   including changes that have not been pushed yet.
+- `[dev.7]` Slicer integration is adapter-based: OrcaSlicer and Bambu Studio
+  can use independent stable slots.
 
 ## [1.1.2] - 2026-11-27
 

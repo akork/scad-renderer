@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $gallery = Join-Path $here 'open_gallery.py'
-$slot = Join-Path $here 'slot_action.py'
 $slicer = Join-Path $here 'slicer_action.py'
 
 function Resolve-Pythonw {
@@ -39,7 +38,6 @@ if ($osc) {
 }
 
 if (-not (Test-Path -LiteralPath $gallery)) { throw "Not found: $gallery" }
-if (-not (Test-Path -LiteralPath $slot)) { throw "Not found: $slot" }
 if (-not (Test-Path -LiteralPath $slicer)) { throw "Not found: $slicer" }
 
 $key = 'HKCU:\Software\Classes\scad-viewer'
@@ -82,7 +80,7 @@ if (Test-Path -LiteralPath $openscad) {
 }
 $slotCommandKey = Join-Path $slotKey 'shell\open\command'
 New-Item -Path $slotCommandKey -Force | Out-Null
-$slotCommand = '"' + $pythonw + '" "' + $slot + '" "%1"'
+$slotCommand = '"' + $pythonw + '" "' + $slicer + '" slot "%1"'
 Set-Item -Path $slotCommandKey -Value $slotCommand
 Write-Output "Protocol installed: scad-slot"
 Write-Output "  $slotCommand"
@@ -97,7 +95,7 @@ if (Test-Path -LiteralPath $openscad) {
 }
 $slicerCommandKey = Join-Path $slicerKey 'shell\open\command'
 New-Item -Path $slicerCommandKey -Force | Out-Null
-$slicerCommand = '"' + $pythonw + '" "' + $slicer + '" "%1"'
+$slicerCommand = '"' + $pythonw + '" "' + $slicer + '" open "%1"'
 Set-Item -Path $slicerCommandKey -Value $slicerCommand
 Write-Output "Protocol installed: scad-slicer"
 Write-Output "  $slicerCommand"
