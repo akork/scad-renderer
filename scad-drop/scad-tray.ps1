@@ -1008,7 +1008,9 @@ $script:NotifyIcon.ContextMenuStrip = $script:Menu
 $script:NotifyIcon.Visible = $true
 $script:NotifyIcon.add_MouseClick({
     if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-        $script:Menu.Show($script:MenuOwner, [System.Windows.Forms.Cursor]::Position)
+        $screenPoint = [System.Windows.Forms.Cursor]::Position
+        $ownerPoint = $script:MenuOwner.PointToClient($screenPoint)
+        $script:Menu.Show($script:MenuOwner, $ownerPoint)
     }
 })
 Update-TrayTooltip

@@ -7,11 +7,11 @@ Git commit subjects are short labels; this file is the detailed history.
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- Left-clicking the tray icon opens the context menu again, as before.
-- The menu is owned by a hidden off-screen form, so the popup does not create
-  an additional taskbar button/window.
+- The left-click tray menu now opens at the cursor instead of the hidden
+  owner form's off-screen origin. The screen point is converted to owner
+  client coordinates before `Show`.
 
 ## [1.1.1] - 2026-11-27
 
