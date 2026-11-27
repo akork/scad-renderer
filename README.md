@@ -1,131 +1,173 @@
 # SCAD Renderer
 
-Current version: **1.0.0** (see `VERSION`).
+Текущая версия: **1.0.4** · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
 
-Source repository for the local OpenSCAD variant renderer, Explorer context-menu
-integration, tray control panel, gallery server and 3D preview.
+Локальный рендерер вариантов OpenSCAD для Windows: контекстное меню Проводника,
+галерея результатов, 3D-просмотр, просмотр исходного кода, слоты OrcaSlicer и
+трей-панель.
 
-The project is intentionally source-only: generated renders, browser profiles,
-OpenSCAD binaries and machine-specific state are ignored by Git.
-
-## Repository layout
+Проект не отслеживает папки. Рендер запускается **из контекстного меню для
+любого `.scad` файла в любом месте файловой системы**. Результат создаётся
+рядом с исходником:
 
 ```text
-.
-├─ scad-variants/       # renderer, gallery generator, local HTTP server, 3D viewer
-├─ scad-drop/           # Explorer context menu, tray, recent renders
-├─ README.md
-└─ .gitignore
+C:\Любая\Папка\
+  my_model.scad
+  my_model_renders\
+    index.html          ← галерея
+    manifest.json
+    contact.png
+    part-frame.png
+    part-frame.stl
 ```
 
-Clone this repository into a workspace that contains the two sibling folders
-above. The installers derive their own location from `$PSScriptRoot`; the main
-remaining machine-specific item is the Python interpreter path.
+## Что умеет
 
-## Requirements
+- Находит текстовые переключатели в `.scad` и рендерит все варианты.
+- Делает PNG-превью и STL за один запуск OpenSCAD.
+- Собирает HTML-галерею с карточками вариантов.
+- Показывает исходный `.scad` в галерее с подсветкой синтаксиса.
+- Открывает 3D-просмотр во всплывающем окне прямо в галерее.
+- Позволяет отправить STL в стабильный слот OrcaSlicer.
+- Открывает OrcaSlicer: переключает уже запущенное окно или запускает его.
+- Открывает превью рендера в отдельном Edge-профиле, переиспользуя вкладку.
+- Показывает прогресс рендера и список недавних рендеров в трее.
 
-- Windows 11
-- Python 3.10+ with Pillow
-- OpenSCAD (current setup uses the portable Manifold build, with the installed
-  OpenSCAD as fallback)
-- Microsoft Edge
+## Два компонента
 
-The existing machine uses the DeepSeek Harness Python at:
+### `scad-variants`
+
+Движок:
+
+- анализ `.scad`;
+- запуск OpenSCAD и рендер PNG/STL;
+- галерея, contact sheet, `manifest.json`;
+- локальный HTTP-сервер на `127.0.0.1:8765`;
+- 3D-вьюер;
+- просмотр кода;
+- слоты OrcaSlicer;
+- тесты.
+
+### `scad-drop`
+
+Windows-обвязка:
+
+- пункт **«Отрендерить SCAD (PNG + STL)»** в контекстном меню;
+- запуск движка для выбранного файла;
+- трей **SCAD Render**;
+- недавние рендеры, открытие папки и превью;
+- скрытый автозапуск;
+- установка контекстного меню, протоколов и ярлыка.
+
+## Как это работает
+
+```text
+Проводник
+  → scad-drop/scad_drop.py --render-file <файл>
+    → scad-variants/scad_variants.py --once --root <папка> --only <файл>
+      → <файл>_renders/
+        → галерея, 3D, код, слоты
+```
+
+`scad-drop` не рендерит сам и не знает деталей OpenSCAD.
+`scad-variants` не знает про Проводник и трей.
+
+## Требования
+
+- Windows 11;
+- Python 3.10+ с Pillow;
+- OpenSCAD (желательно Manifold-сборка; обычная установка тоже поддерживается);
+- Microsoft Edge.
+
+На текущей машине используется Python из DeepSeek Harness:
 
 ```text
 %USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\pythonw.exe
 ```
 
-The protocol installer uses that path when present and falls back to
-`pythonw.exe` from `PATH`.
+## Установка
 
-## Install on a machine
-
-1. Clone/copy the repository so that `scad-variants/` and `scad-drop/` are
-   siblings.
-2. Install the Explorer context menu:
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scad-drop\install-context-menu.ps1
-   ```
-
-3. Install the local protocol handlers (`scad-gallery`, `scad-slot`,
-   `scad-slicer`, `scad-embed`):
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scad-variants\install-viewer-protocol.ps1
-   ```
-
-4. Install tray autostart:
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scad-drop\install-tray-autostart.ps1
-   ```
-
-5. Optionally recreate the Start Menu shortcut / toast AUMID:
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scad-variants\install-notifications.ps1
-   ```
-
-## Usage
-
-Render any `.scad` file from Explorer:
-
-```text
-Right click → Отрендерить SCAD (PNG + STL)
-```
-
-The renderer writes `<name>_renders/` next to the source file and opens the
-gallery. There is no permanent folder watcher.
-
-The tray icon **SCAD Render** shows:
-
-- active render progress;
-- recent renders (name + date/time);
-- preview in the dedicated Edge profile on the name, folder icon for the render
-  directory;
-- local gallery server status.
-
-## Architecture
-
-- `scad_variants.py` — one-shot variant renderer and gallery builder.
-- `scadvariants/gallery.py` — HTML gallery, split code view, 3D UI.
-- `scadvariants/gallery_server.py` — local HTTP server (default port `8765`).
-- `viewer/viewer.html` — Three.js 3D viewer.
-- `scad-drop/scad_drop.py --render-file` — Explorer context-menu entry point.
-- `scad-drop/scad-tray.ps1` — WinForms tray UI.
-- `scad-drop/tray-host.ps1` + `tray-launch.vbs` — hidden host/relaunch loop.
-
-Runtime folders such as `scad-variants/state/` and `scad-drop/state/` are
-machine-local and ignored.
-
-## Tests
-
-```powershell
-cd scad-variants
-python -m unittest discover -s tests
-```
-
-## Git
-
-The repository is ready for GitHub. It is currently stored at:
-
-```text
-https://github.com/akork/scad-renderer
-```
-
-The repository is **private**. Clone it anywhere and keep `scad-variants/` and
-`scad-drop/` as sibling folders:
+Клонировать репозиторий так, чтобы `scad-variants/` и `scad-drop/` были
+соседними папками:
 
 ```powershell
 git clone https://github.com/akork/scad-renderer.git
 ```
 
-After later edits:
+Установить контекстное меню:
 
 ```powershell
-git add .
-git commit -m "Describe the change"
-git push
+powershell -ExecutionPolicy Bypass -File .\scad-drop\install-context-menu.ps1
 ```
+
+Установить локальные протоколы:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scad-variants\install-viewer-protocol.ps1
+```
+
+Установить автозапуск трея:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scad-drop\install-tray-autostart.ps1
+```
+
+При необходимости пересоздать ярлык и AUMID уведомлений:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scad-variants\install-notifications.ps1
+```
+
+## Использование
+
+1. Нажать правой кнопкой на `.scad` в Проводнике.
+2. Выбрать **«Отрендерить SCAD (PNG + STL)»**.
+3. Дождаться галереи.
+4. В галерее:
+   - клик по основной части картинки — 3D;
+   - клик по иконке в правом верхнем углу — картинка на весь экран;
+   - кнопка **«Код»** — исходник с подсветкой;
+   - кнопки слотов — отправка STL в OrcaSlicer;
+   - **«Открыть слайсер»** — фокус на OrcaSlicer или его запуск.
+
+## Структура репозитория
+
+```text
+.
+├─ scad-variants/       движок, галерея, сервер, 3D, тесты
+├─ scad-drop/           контекстное меню, трей, Edge-превью
+├─ CHANGELOG.md         полная история изменений
+├─ VERSION              текущая версия
+├─ AGENTS.md            правила проекта для агента
+└─ README.md
+```
+
+`scad-variants/state/`, `scad-drop/state/`, профили браузеров, сгенерированные
+рендеры, `SCAD/`, `orca-slots/`, `tools/` и `deliverables/` в Git не входят.
+
+## Тесты
+
+```powershell
+cd scad-variants
+python -m unittest discover -s tests
+
+cd ..\scad-drop
+python -m unittest discover -s tests
+```
+
+## Git и версии
+
+- версия хранится в `VERSION`;
+- подробная история — в `CHANGELOG.md`;
+- коммиты короткие, вида `vX.Y.Z: ...`;
+- облако обновляется пакетно: после 5 версий или 14 дней, либо по запросу;
+- перед push локальные minor-коммиты схлопываются в один релизный коммит;
+- тег ставится только на релизный коммит.
+
+Репозиторий: <https://github.com/akork/scad-renderer> (private).
+
+## Документация компонентов
+
+- [`scad-variants/README.md`](scad-variants/README.md) — движок, CLI, галерея, сервер.
+- [`scad-drop/README.md`](scad-drop/README.md) — контекстное меню, трей, Edge.
+- [`CHANGELOG.md`](CHANGELOG.md) — история версий.
