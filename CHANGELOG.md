@@ -9,8 +9,9 @@ Git commit subjects are short labels; this file is the detailed history.
 
 ### Changed
 
-- Left-clicking the tray icon no longer opens the full context menu. The menu
-  remains available by right-click as the native NotifyIcon context menu.
+- Left-clicking the tray icon opens the context menu again, as before.
+- The menu is owned by a hidden off-screen form, so the popup does not create
+  an additional taskbar button/window.
 
 ## [1.1.1] - 2026-11-27
 

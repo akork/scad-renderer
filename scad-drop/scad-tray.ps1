@@ -912,6 +912,17 @@ $script:Menu.add_Opening({
     Build-TrayMenu
 })
 
+# Hidden owner form: the menu is owned by it, so Windows does not create a
+# separate taskbar button for the popup shown by a left-click.
+$script:MenuOwner = New-Object System.Windows.Forms.Form
+$script:MenuOwner.ShowInTaskbar = $false
+$script:MenuOwner.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+$script:MenuOwner.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+$script:MenuOwner.Location = New-Object System.Drawing.Point(-32000, -32000)
+$script:MenuOwner.Size = New-Object System.Drawing.Size(1, 1)
+$script:MenuOwner.Opacity = 0
+$script:MenuOwner.Show()
+
 Add-Type -TypeDefinition @'
 using System;
 using System.Drawing;
@@ -995,6 +1006,11 @@ $script:NotifyIcon.Icon = $icon
 $script:NotifyIcon.Text = "SCAD Render $script:AppVersionLabel"
 $script:NotifyIcon.ContextMenuStrip = $script:Menu
 $script:NotifyIcon.Visible = $true
+$script:NotifyIcon.add_MouseClick({
+    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+        $script:Menu.Show($script:MenuOwner, [System.Windows.Forms.Cursor]::Position)
+    }
+})
 Update-TrayTooltip
 
 $timer = New-Object System.Windows.Forms.Timer
@@ -1024,6 +1040,10 @@ if ($script:MenuTimer) {
 }
 $script:NotifyIcon.Visible = $false
 $script:NotifyIcon.Dispose()
+if ($script:MenuOwner) {
+    $script:MenuOwner.Close()
+    $script:MenuOwner.Dispose()
+}
 $mutex.ReleaseMutex()
 
 if ($script:RestartRequested) {
