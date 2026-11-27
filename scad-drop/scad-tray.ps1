@@ -129,9 +129,9 @@ function Get-PythonwPath {
 
 function Open-RenderPreview([string]$Index) {
     $pythonw = Get-PythonwPath
-    $helper = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\open_render.py'
+    $helper = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\open_gallery.py'
     if ($pythonw -and (Test-Path -LiteralPath $helper)) {
-        Start-Process -FilePath $pythonw -ArgumentList @($helper, $Index) -WindowStyle Hidden | Out-Null
+        Start-Process -FilePath $pythonw -ArgumentList @($helper, '--reuse-tab', $Index) -WindowStyle Hidden | Out-Null
         return
     }
     Start-Process -FilePath $Index | Out-Null

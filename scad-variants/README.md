@@ -102,7 +102,7 @@ python -m scadvariants.gallery_server --serve --port 8765
 - `slots.py` — реестр стабильных STL-слотов;
 - `slot_action.py` — обработчик `scad-slot:`;
 - `slicer_action.py` — фокусировка/запуск OrcaSlicer;
-- `embed_action.py` — запуск локального сервера для 3D из файловой галереи.
+- `open_gallery.py --ensure` — запуск локального сервера для 3D из файловой галереи.
 
 ## Зависимости
 
