@@ -833,10 +833,46 @@ function Build-TrayMenu {
 
         [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 
+        $service = New-Object System.Windows.Forms.ToolStripMenuItem
+        $service.Text = 'Сервис'
+
         $restart = New-Object System.Windows.Forms.ToolStripMenuItem
         $restart.Text = 'Перезагрузить программу'
         $restart.add_Click({ Restart-Tray })
-        [void]$menu.Items.Add($restart)
+        [void]$service.DropDownItems.Add($restart)
+        [void]$service.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+        $history = New-Object System.Windows.Forms.ToolStripMenuItem
+        $history.Text = 'Открыть историю изменений'
+        $history.add_Click({
+            $historyPath = Join-Path (Split-Path -Parent $script:ScadRoot) 'CHANGELOG.md'
+            if (-not (Test-Path -LiteralPath $historyPath)) {
+                Write-TrayLog "changelog missing: $historyPath"
+                return
+            }
+            try {
+                Start-Process -FilePath $historyPath | Out-Null
+                Write-TrayLog "open changelog: $historyPath"
+            } catch {
+                try {
+                    Start-Process -FilePath 'notepad.exe' -ArgumentList ('"' + $historyPath + '"') | Out-Null
+                    Write-TrayLog "open changelog in notepad: $historyPath"
+                } catch {
+                    Write-TrayLog "changelog open failed: $($_.Exception.Message)"
+                }
+            }
+        })
+        [void]$service.DropDownItems.Add($history)
+
+        $github = New-Object System.Windows.Forms.ToolStripMenuItem
+        $github.Text = 'Открыть GitHub'
+        $github.add_Click({
+            Start-Process -FilePath 'https://github.com/akork/scad-renderer' | Out-Null
+            Write-TrayLog 'open GitHub repository'
+        })
+        [void]$service.DropDownItems.Add($github)
+
+        [void]$menu.Items.Add($service)
 
         $exit = New-Object System.Windows.Forms.ToolStripMenuItem
         $exit.Text = 'Выход'

@@ -6,6 +6,13 @@ Technical details, implementation attempts and architecture decisions belong in
 commit bodies, an optional `DEVLOG.md`, or ADRs — not in this file. The format
 follows Keep a Changelog and the project uses semantic versioning.
 
+## [Unreleased]
+
+### Added
+
+- Tray **Сервис** submenu with restart, local changelog and GitHub repository
+  actions.
+
 ## [1.1.2] - 2026-11-27
 
 ### Fixed
