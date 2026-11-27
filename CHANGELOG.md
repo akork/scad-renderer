@@ -8,12 +8,14 @@ follows Keep a Changelog and the project uses semantic versioning.
 
 ## [Unreleased]
 
+<!-- Local-only dev markers. Remove and summarize before a release. -->
+
 ### Added
 
-- Tray **Сервис** submenu with restart, local changelog and GitHub repository
-  actions.
-- The changelog action opens a rendered local preview in the browser, including
-  changes that have not been pushed yet.
+- `[dev.2]` Tray **Сервис** submenu with restart, local changelog and GitHub
+  repository actions.
+- `[dev.3]` The changelog action opens a rendered local preview in the browser,
+  including changes that have not been pushed yet.
 
 ## [1.1.2] - 2026-11-27
 
