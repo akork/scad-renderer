@@ -5,6 +5,32 @@ All notable changes to this project are documented here.
 The format follows Keep a Changelog, and the project uses semantic versioning.
 Git commit subjects are short labels; this file is the detailed history.
 
+## [1.1.0] - 2026-11-27
+
+Собирает локальные dev.1–dev.8 в один релиз.
+
+### Added
+
+- Local `BUILD` counter and `VERSION-dev.N` display for development builds.
+- Tray tooltip and menu show the current local build.
+- Hovering the folder icon in a recent-render row shows the full render folder
+  path in a tooltip.
+
+### Changed
+
+- Local changes increment `BUILD`; a release resets it to `0` and bumps the
+  semantic version.
+- Application logs, manifests and tray status carry the local build label.
+- Recent-render rows use native `ToolStripMenuItem` rows: the folder icon stays
+  in the native image/checkmark gutter, the render name is the item text, and
+  the date/time is a native right-aligned shortcut display.
+- Date and time stay on one line; the em dash separator was removed.
+- Commit-body rules require the test count and result.
+
+### Removed
+
+- The custom hosted table row that produced a gray background.
+
 ## [1.0.4] - 2026-11-27
 
 ### Added

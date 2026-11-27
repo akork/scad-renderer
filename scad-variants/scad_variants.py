@@ -12,7 +12,7 @@ from scadvariants.render import (
     find_openscad,
     openscad_version,
 )
-from scadvariants.watch import APP_VERSION, WatchConfig, Watcher, _now_iso
+from scadvariants.watch import APP_VERSION_DISPLAY, WatchConfig, Watcher, _now_iso
 
 DEFAULT_INPUT_DIR = "SCAD"
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -232,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     watcher = Watcher(config)
 
-    logger.info("scad-variants %s", APP_VERSION)
+    logger.info("scad-variants %s", APP_VERSION_DISPLAY)
     logger.info("OpenSCAD: %s", version)
     logger.info("root:   %s", root)
     logger.info("state:  %s", state_root)

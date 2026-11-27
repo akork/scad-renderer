@@ -35,19 +35,26 @@ from .gallery_server import open_gallery_page
 LOG = logging.getLogger("scadvariants")
 
 
-def _read_app_version() -> str:
+def _read_app_version() -> tuple[str, int]:
     for parent in Path(__file__).resolve().parents:
         candidate = parent / "VERSION"
         try:
             value = candidate.read_text(encoding="utf-8").strip()
         except OSError:
             continue
-        if value:
-            return value
-    return "1.0.0"
+        if not value:
+            continue
+        build = 0
+        try:
+            build = int((parent / "BUILD").read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            pass
+        return value, max(0, build)
+    return "1.0.0", 0
 
 
-APP_VERSION = _read_app_version()
+APP_VERSION, APP_BUILD = _read_app_version()
+APP_VERSION_DISPLAY = f"{APP_VERSION}-dev.{APP_BUILD}" if APP_BUILD else APP_VERSION
 
 # Values that are valid exports but very expensive to evaluate.  They are not
 # skipped: the size sorter puts them near the front when no previous STL size
@@ -884,7 +891,7 @@ class Watcher:
 
         manifest: dict[str, Any] = {
             "schema": 1,
-            "app_version": APP_VERSION,
+            "app_version": APP_VERSION_DISPLAY,
             "source": self._manifest_source(source),
             "source_sha256": scad.raw_sha256,
             "status": status,

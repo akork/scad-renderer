@@ -23,6 +23,22 @@ Add-Type -AssemblyName System.Drawing
 $script:Downloads = [IO.Path]::GetFullPath($Downloads)
 $script:ScadRoot = [IO.Path]::GetFullPath($ScadRoot)
 $script:StateDir = [IO.Path]::GetFullPath($StateDir)
+$workspaceRoot = Split-Path -Parent $script:ScadRoot
+$script:AppVersion = '1.0.4'
+try {
+    $v = (Get-Content -LiteralPath (Join-Path $workspaceRoot 'VERSION') -Raw).Trim()
+    if ($v) { $script:AppVersion = $v }
+} catch { }
+$script:AppBuild = 0
+try {
+    $b = (Get-Content -LiteralPath (Join-Path $workspaceRoot 'BUILD') -Raw).Trim()
+    [void][int]::TryParse($b, [ref]$script:AppBuild)
+} catch { }
+$script:AppVersionLabel = if ($script:AppBuild -gt 0) {
+    "$($script:AppVersion)-dev.$($script:AppBuild)"
+} else {
+    $script:AppVersion
+}
 New-Item -ItemType Directory -Force -Path $script:StateDir | Out-Null
 $script:StatePath = Join-Path $script:StateDir 'tray.json'
 $script:LogPath = Join-Path $script:StateDir 'tray.log'
@@ -238,7 +254,9 @@ function Get-RecentRenders {
         $items += [pscustomobject]@{
             Name = $name
             When = $when
-            Label = $name + '  —  ' + $when.ToString('dd.MM.yyyy HH:mm')
+            Date = $when.ToString('dd.MM.yyyy')
+            Time = $when.ToString('HH:mm')
+            Folder = $folder.FullName
             Index = $index
         }
     }
@@ -274,10 +292,10 @@ function Update-TrayTooltip {
     if (-not $script:NotifyIcon) { return }
     $tasks = @(Get-ActiveRenderTasks)
     if ($tasks.Count -eq 0) {
-        $text = 'SCAD Render'
+        $text = "SCAD Render $script:AppVersionLabel"
     } else {
         $first = $tasks[0].Data
-        $text = "SCAD Render — $($tasks.Count) задач: $($first.done)/$($first.total)"
+        $text = "SCAD Render $script:AppVersionLabel — $($tasks.Count) задач: $($first.done)/$($first.total)"
     }
     if ($text.Length -gt 63) {
         $text = $text.Substring(0, 63)
@@ -646,6 +664,7 @@ function Add-FileActions($Items, [string]$Path) {
 function Build-TrayMenu {
     try {
         $menu = $script:Menu
+        $menu.ShowItemToolTips = $true
         $menu.Items.Clear()
         $script:ProgressUi = @()
 
@@ -735,6 +754,11 @@ function Build-TrayMenu {
             }
         }
 
+        $versionItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $versionItem.Text = "Версия: $script:AppVersionLabel"
+        $versionItem.Enabled = $false
+        [void]$menu.Items.Add($versionItem)
+
         $serverStatus = New-Object System.Windows.Forms.ToolStripMenuItem
         $serverStatus.Enabled = $false
         $serverStatus.Text = 'Сервер: остановлен'
@@ -772,19 +796,35 @@ function Build-TrayMenu {
 
             foreach ($render in $recentRenders) {
                 $renderItem = New-Object System.Windows.Forms.ToolStripMenuItem
-                $renderItem.Text = $render.Label
-                $renderItem.Tag = $render.Index
-                $renderItem.ToolTipText = 'Клик по названию — превью; иконка папки — открыть папку'
+                $renderItem.Text = [string]$render.Name
+                $renderItem.Tag = $render
+                $defaultTip = $render.Name + ', ' + $render.Date + ' ' + $render.Time
+                $renderItem.ToolTipText = $defaultTip
                 $renderItem.Image = Get-FolderMenuIcon
                 $renderItem.ImageScaling = [System.Windows.Forms.ToolStripItemImageScaling]::SizeToFit
                 $renderItem.ImageAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+                $renderItem.ShowShortcutKeys = $true
+                $renderItem.ShortcutKeyDisplayString = $render.Date + ' ' + $render.Time
+                $renderItem.add_MouseMove({
+                    param($sender, $eventArgs)
+                    $tip = if ($eventArgs.X -lt 24) {
+                        [string]$sender.Tag.Folder
+                    } else {
+                        [string]$sender.Tag.Name + ', ' + [string]$sender.Tag.Date + ' ' + [string]$sender.Tag.Time
+                    }
+                    if ($sender.ToolTipText -ne $tip) { $sender.ToolTipText = $tip }
+                })
+                $renderItem.add_MouseLeave({
+                    param($sender, $eventArgs)
+                    $sender.ToolTipText = [string]$sender.Tag.Name + ', ' + [string]$sender.Tag.Date + ' ' + [string]$sender.Tag.Time
+                })
                 $renderItem.add_MouseUp({
                     param($sender, $eventArgs)
                     if ($eventArgs.Button -ne [System.Windows.Forms.MouseButtons]::Left) { return }
                     if ($eventArgs.X -lt 24) {
-                        Open-RenderFolder ([string]$sender.Tag)
+                        Open-RenderFolder ([string]$sender.Tag.Index)
                     } else {
-                        Open-RenderPreview ([string]$sender.Tag)
+                        Open-RenderPreview ([string]$sender.Tag.Index)
                     }
                 })
                 [void]$menu.Items.Add($renderItem)
@@ -952,7 +992,7 @@ if (-not $icon) { $icon = [System.Drawing.SystemIcons]::Application }
 
 $script:NotifyIcon = New-Object System.Windows.Forms.NotifyIcon
 $script:NotifyIcon.Icon = $icon
-$script:NotifyIcon.Text = 'SCAD Render'
+$script:NotifyIcon.Text = "SCAD Render $script:AppVersionLabel"
 $script:NotifyIcon.ContextMenuStrip = $script:Menu
 $script:NotifyIcon.Visible = $true
 $script:NotifyIcon.add_MouseClick({

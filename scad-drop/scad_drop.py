@@ -29,16 +29,21 @@ from typing import Any, Sequence
 APP_NAME = "scad-drop"
 
 
-def _read_app_version() -> str:
-    candidate = Path(__file__).resolve().parent.parent / "VERSION"
+def _read_app_version() -> tuple[str, int]:
+    root = Path(__file__).resolve().parent.parent
     try:
-        value = candidate.read_text(encoding="utf-8").strip()
+        value = (root / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:
-        return "1.0.0"
-    return value or "1.0.0"
+        return "1.0.0", 0
+    try:
+        build = int((root / "BUILD").read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        build = 0
+    return (value or "1.0.0"), max(0, build)
 
 
-APP_VERSION = _read_app_version()
+APP_VERSION, APP_BUILD = _read_app_version()
+APP_VERSION_DISPLAY = f"{APP_VERSION}-dev.{APP_BUILD}" if APP_BUILD else APP_VERSION
 
 DEFAULT_EXTENSIONS = (".scad",)
 DEFAULT_POLL = 2.0
@@ -1368,6 +1373,7 @@ def main(argv: list[str] | None = None) -> int:
     args.state = Path(args.state).expanduser().resolve()
 
     _setup_logging(args.state, args.verbose)
+    LOG.info("%s %s", APP_NAME, APP_VERSION_DISPLAY)
     return render_one_file(
         Path(args.render_file),
         args.tool,

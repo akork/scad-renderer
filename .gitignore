@@ -5,6 +5,7 @@
 !/.gitattributes
 !/README.md
 !/VERSION
+!/BUILD
 !/AGENTS.md
 !/CHANGELOG.md
 !/scad-variants/
