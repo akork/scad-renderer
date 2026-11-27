@@ -37,11 +37,26 @@ def doctor() -> int:
     return 0
 
 
+def _pop_option(args: list[str], name: str) -> str | None:
+    if name not in args:
+        return None
+    index = args.index(name)
+    if index + 1 >= len(args):
+        return None
+    value = args[index + 1]
+    del args[index : index + 2]
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
         return usage()
     mode = args.pop(0).lower()
+    target = _pop_option(args, "--target")
+    quiet = "--quiet" in args
+    if quiet:
+        args.remove("--quiet")
     if mode == "render-file":
         from scad_drop import main as drop_main
 
@@ -77,15 +92,15 @@ def main(argv: list[str] | None = None) -> int:
     if mode == "install":
         from scadvariants.release_install import install
 
-        return install(quiet="--quiet" in args)
+        return install(quiet=quiet, target=target)
     if mode == "uninstall":
         from scadvariants.release_install import uninstall
 
-        return uninstall(quiet="--quiet" in args)
+        return uninstall(quiet=quiet, target=target)
     if mode == "unregister":
         from scadvariants.release_install import unregister
 
-        return unregister(quiet="--quiet" in args)
+        return unregister(quiet=quiet, target=target)
     if mode == "doctor":
         return doctor()
     if mode in {"version", "--version", "-v"}:

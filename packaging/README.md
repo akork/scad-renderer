@@ -21,8 +21,8 @@ release\SCADRendererSetup-<VERSION>.exe
 ```
 
 The setup wizard installs the full application into
-`%LOCALAPPDATA%\Programs\SCADRenderer`, registers the shell integrations,
-creates the Start Menu shortcut and adds an uninstaller entry.
+`%LOCALAPPDATA%\Programs\SCADRenderer`. The folder can be changed on the
+directory page.
 
 If the application is already installed, the wizard offers:
 
@@ -30,7 +30,8 @@ If the application is already installed, the wizard offers:
 - **Удалить SCAD Renderer**.
 
 The Start Menu also gets a **Удалить SCAD Renderer** shortcut. The normal
-uninstaller is registered in Windows Apps & Features.
+uninstaller is registered in Windows Apps & Features. After removal, a
+confirmation window is shown and closes automatically after 10 seconds.
 
 ## Release folder
 

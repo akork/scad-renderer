@@ -201,20 +201,25 @@ def _unregister_startup() -> None:
     )
 
 
-def install(*, quiet: bool = False) -> int:
+def _resolve_target(target: Path | str | None) -> Path:
+    return Path(target).expanduser().resolve() if target else TARGET
+
+
+def install(*, quiet: bool = False, target: Path | str | None = None) -> int:
+    target = _resolve_target(target)
     source = app_root()
-    _log(f"install start source={source} target={TARGET} self={os.getpid()}")
-    if source != TARGET:
-        TARGET.mkdir(parents=True, exist_ok=True)
-        _stop_old(TARGET)
+    _log(f"install start source={source} target={target} self={os.getpid()}")
+    if source != target:
+        target.mkdir(parents=True, exist_ok=True)
+        _stop_old(target)
         _log("stop old done")
-        shutil.copytree(source, TARGET, dirs_exist_ok=True)
+        shutil.copytree(source, target, dirs_exist_ok=True)
         _log("copy done")
     else:
-        _stop_old(TARGET)
+        _stop_old(target)
         _log("stop old done (in place)")
 
-    exe = TARGET / "SCADRenderer.exe"
+    exe = target / "SCADRenderer.exe"
     if not exe.is_file():
         message = f"Не найден {exe}"
         _log(message)
@@ -223,9 +228,9 @@ def install(*, quiet: bool = False) -> int:
         return 1
 
     try:
-        _register_shell(TARGET)
+        _register_shell(target)
         _log("registry done")
-        _register_startup(TARGET)
+        _register_startup(target)
         _log("startup done")
     except Exception as exc:
         _log(f"install failed: {exc}")
@@ -235,16 +240,17 @@ def install(*, quiet: bool = False) -> int:
 
     if not quiet:
         _show(
-            f"SCAD Renderer установлен:\n\n{TARGET}\n\n"
+            f"SCAD Renderer установлен:\n\n{target}\n\n"
             "Контекстное меню, протоколы и автозапуск настроены."
         )
     _log("install complete")
     return 0
 
 
-def unregister(*, quiet: bool = False) -> int:
+def unregister(*, quiet: bool = False, target: Path | str | None = None) -> int:
     """Remove shell integrations and autostart, but keep the app folder."""
-    _stop_old(TARGET)
+    target = _resolve_target(target)
+    _stop_old(target)
     _unregister_startup()
     _unregister_shell()
     if not quiet:
@@ -252,12 +258,13 @@ def unregister(*, quiet: bool = False) -> int:
     return 0
 
 
-def uninstall(*, quiet: bool = False) -> int:
-    _stop_old(TARGET)
+def uninstall(*, quiet: bool = False, target: Path | str | None = None) -> int:
+    target = _resolve_target(target)
+    _stop_old(target)
     _unregister_startup()
     _unregister_shell()
-    if TARGET.is_dir():
-        shutil.rmtree(TARGET, ignore_errors=True)
+    if target.is_dir():
+        shutil.rmtree(target, ignore_errors=True)
     if not quiet:
         _show("SCAD Renderer удалён.\n\nСлоты в slicer-slots сохранены.")
     return 0

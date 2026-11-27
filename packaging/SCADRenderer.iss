@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.0-dev.7"
+  #define MyAppVersion "1.2.0-dev.8"
 #endif
 
 #define MyAppName "SCAD Renderer"
@@ -19,7 +19,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={localappdata}\Programs\SCADRenderer
 DefaultGroupName={#MyAppName}
-DisableDirPage=yes
+DisableDirPage=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -32,7 +32,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 SetupLogging=yes
-UsePreviousAppDir=no
+UsePreviousAppDir=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 CloseApplications=no
@@ -51,10 +51,10 @@ Name: "{autodesktop}\SCAD Render"; Filename: "{sys}\wscript.exe"; Parameters: ""
 Name: "{group}\Удалить SCAD Renderer"; Filename: "{app}\unins000.exe"; Parameters: "/VERYSILENT"; IconFilename: "{app}\SCADRenderer.exe"; IconIndex: 0
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "install --quiet"; StatusMsg: "Регистрация SCAD Renderer..."; Flags: runhidden waituntilterminated
+Filename: "{app}\{#MyAppExeName}"; Parameters: "install --quiet --target ""{app}"""; StatusMsg: "Регистрация SCAD Renderer..."; Flags: runhidden waituntilterminated
 
 [UninstallRun]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "unregister --quiet"; RunOnceId: "UnregisterScadRenderer"; Flags: runhidden waituntilterminated
+Filename: "{app}\{#MyAppExeName}"; Parameters: "unregister --quiet --target ""{app}"""; RunOnceId: "UnregisterScadRenderer"; Flags: runhidden waituntilterminated
 
 [Code]
 var
@@ -62,10 +62,87 @@ var
   ReinstallRadio: TNewRadioButton;
   RemoveRadio: TNewRadioButton;
   Removing: Boolean;
+  RemovalForm: TSetupForm;
+  RemovalText: TNewStaticText;
+  RemovalTimer: Longword;
+  RemovalSeconds: Integer;
+
+function SetTimer(hWnd, nIDEvent, uElapse, lpTimerFunc: Longword): Longword;
+external 'SetTimer@user32.dll stdcall';
+
+function KillTimer(hWnd, nIDEvent: Longword): Bool;
+external 'KillTimer@user32.dll stdcall';
+
+function GetInstallDir: String;
+begin
+  Result := WizardForm.DirEdit.Text;
+  if Result = '' then
+    Result := ExpandConstant('{localappdata}\Programs\SCADRenderer');
+end;
 
 function IsInstalled: Boolean;
 begin
-  Result := FileExists(ExpandConstant('{localappdata}\Programs\SCADRenderer\SCADRenderer.exe'));
+  Result := FileExists(AddBackslash(GetInstallDir) + 'SCADRenderer.exe');
+end;
+
+procedure RemovalTimerProc(Arg1, Arg2, Arg3, Arg4: Longword);
+begin
+  if RemovalForm = nil then
+    Exit;
+  Dec(RemovalSeconds);
+  if RemovalSeconds <= 0 then
+  begin
+    if RemovalTimer <> 0 then
+    begin
+      KillTimer(0, RemovalTimer);
+      RemovalTimer := 0;
+    end;
+    RemovalForm.Close;
+  end
+  else
+    RemovalText.Caption := 'SCAD Renderer удалён.' + #13#10 +
+      'Окно закроется через ' + IntToStr(RemovalSeconds) + ' сек.';
+end;
+
+procedure ShowRemovalComplete;
+var
+  CloseButton: TNewButton;
+begin
+  RemovalSeconds := 10;
+  RemovalForm := CreateCustomForm(ScaleX(440), ScaleY(150), False, True);
+  try
+    RemovalForm.Caption := 'SCAD Renderer';
+    RemovalText := TNewStaticText.Create(RemovalForm);
+    RemovalText.Parent := RemovalForm;
+    RemovalText.Left := ScaleX(18);
+    RemovalText.Top := ScaleY(20);
+    RemovalText.Width := RemovalForm.ClientWidth - ScaleX(36);
+    RemovalText.Height := ScaleY(70);
+    RemovalText.WordWrap := True;
+    RemovalText.Caption := 'SCAD Renderer удалён.' + #13#10 +
+      'Окно закроется через 10 сек.';
+
+    CloseButton := TNewButton.Create(RemovalForm);
+    CloseButton.Parent := RemovalForm;
+    CloseButton.Caption := 'Закрыть';
+    CloseButton.Width := ScaleX(95);
+    CloseButton.Height := ScaleY(25);
+    CloseButton.Left := RemovalForm.ClientWidth - CloseButton.Width - ScaleX(18);
+    CloseButton.Top := RemovalForm.ClientHeight - CloseButton.Height - ScaleY(16);
+    CloseButton.ModalResult := mrOk;
+    CloseButton.Default := True;
+
+    RemovalTimer := SetTimer(0, 0, 1000, CreateCallback(@RemovalTimerProc));
+    RemovalForm.ShowModal;
+  finally
+    if RemovalTimer <> 0 then
+    begin
+      KillTimer(0, RemovalTimer);
+      RemovalTimer := 0;
+    end;
+    RemovalForm.Free;
+    RemovalForm := nil;
+  end;
 end;
 
 procedure InitializeWizard;
@@ -120,7 +197,7 @@ begin
     Exit;
   end;
 
-  Uninstaller := ExpandConstant('{localappdata}\Programs\SCADRenderer\unins000.exe');
+  Uninstaller := AddBackslash(GetInstallDir) + 'unins000.exe';
   if FileExists(Uninstaller) then
   begin
     if not Exec(
@@ -137,11 +214,11 @@ begin
       Exit;
     end;
   end
-  else if FileExists(ExpandConstant('{localappdata}\Programs\SCADRenderer\SCADRenderer.exe')) then
+  else if FileExists(AddBackslash(GetInstallDir) + 'SCADRenderer.exe') then
   begin
     Exec(
-      ExpandConstant('{localappdata}\Programs\SCADRenderer\SCADRenderer.exe'),
-      'uninstall --quiet',
+      AddBackslash(GetInstallDir) + 'SCADRenderer.exe',
+      'uninstall --quiet --target "' + GetInstallDir + '"',
       '',
       SW_HIDE,
       ewWaitUntilTerminated,
@@ -151,6 +228,7 @@ begin
 
   Result := False;
   Removing := True;
+  ShowRemovalComplete;
   WizardForm.Close;
 end;
 

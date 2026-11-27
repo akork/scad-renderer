@@ -25,6 +25,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   reinstall or remove; a Start Menu uninstall entry is added.
 - `[dev.7]` Fix overlapping reinstall/remove choices and suppress the
   misleading “installation not complete” prompt after removal.
+- `[dev.8]` The setup offers a custom install folder and shows a timed
+  “removal complete” confirmation after uninstalling.
 
 ## [1.2.0] - 2026-11-27
 
