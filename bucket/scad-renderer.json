@@ -1,10 +1,10 @@
 {
-    "version": "1.3.0",
+    "version": "1.3.1",
     "description": "OpenSCAD variant renderer with PNG/STL output, gallery and slicer slots.",
     "homepage": "https://github.com/akork/scad-renderer",
     "license": "Freeware",
-    "url": "https://github.com/akork/scad-renderer/releases/download/v1.3.0/SCADRenderer-1.3.0-win64.zip",
-    "hash": "0029ad9a34fe0e2598689e34ea2dbf55c848ee075db9acf030f43045259fba34",
+    "url": "https://github.com/akork/scad-renderer/releases/download/v1.3.1/SCADRenderer-1.3.1-win64.zip",
+    "hash": "a72c1313d010c6aafc687ce381fc567ebe6019e85bef9847bf2975392d08dc80",
     "bin": [
         [
             "SCADRenderer.exe",

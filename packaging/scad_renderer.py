@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -17,7 +19,7 @@ def usage() -> int:
         "usage: SCADRenderer.exe "
         "render-file PATH | render-core ARGS... | gallery ARGS... | "
         "viewer URI | ensure URI | slot URI | slicer URI | serve [--port N] | "
-        "install [--quiet] | uninstall [--quiet] | unregister [--quiet] | "
+        "tray | install [--quiet] | uninstall [--quiet] | unregister [--quiet] | "
         "doctor",
         file=sys.stderr,
     )
@@ -46,6 +48,26 @@ def _pop_option(args: list[str], name: str) -> str | None:
     value = args[index + 1]
     del args[index : index + 2]
     return value
+
+
+def launch_tray() -> int:
+    tray_dir = (
+        Path(sys.executable).resolve().parent / "tray"
+        if getattr(sys, "frozen", False)
+        else ROOT / "scad-drop"
+    )
+    vbs = tray_dir / "tray-launch.vbs"
+    if not vbs.is_file():
+        return 1
+    subprocess.Popen(
+        [str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "wscript.exe"), str(vbs)],
+        cwd=str(tray_dir),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -101,6 +123,8 @@ def main(argv: list[str] | None = None) -> int:
         from scadvariants.release_install import unregister
 
         return unregister(quiet=quiet, target=target)
+    if mode == "tray":
+        return launch_tray()
     if mode == "doctor":
         return doctor()
     if mode in {"version", "--version", "-v"}:

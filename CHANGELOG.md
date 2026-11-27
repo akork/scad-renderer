@@ -6,6 +6,14 @@ Technical details, implementation attempts and architecture decisions belong in
 commit bodies, an optional `DEVLOG.md`, or ADRs — not in this file. The format
 follows Keep a Changelog and the project uses semantic versioning.
 
+## [1.3.1] - 2026-11-27
+
+### Changed
+
+- The Start Menu entry now launches the tray through
+  `SCADRenderer.exe tray` and uses the application icon instead of a folder
+  icon.
+
 ## [1.3.0] - 2026-11-27
 
 ### Added

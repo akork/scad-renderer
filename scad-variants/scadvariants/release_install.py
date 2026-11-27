@@ -182,10 +182,10 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
 Register-ScheduledTask -TaskName '{TASK_NAME}' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 $ws = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut({_ps_quote(str(START_MENU))})
-$lnk.TargetPath = "$env:SystemRoot\\System32\\wscript.exe"
-$lnk.Arguments = '"' + (Join-Path $tray 'tray-launch.vbs') + '"'
-$lnk.WorkingDirectory = $tray
-$lnk.IconLocation = "$env:SystemRoot\\System32\\shell32.dll,3"
+$lnk.TargetPath = (Join-Path $target 'SCADRenderer.exe')
+$lnk.Arguments = 'tray'
+$lnk.WorkingDirectory = $target
+$lnk.IconLocation = (Join-Path $target 'SCADRenderer.exe') + ',0'
 $lnk.Description = 'SCAD Render'
 $lnk.Save()
 Start-ScheduledTask -TaskName '{TASK_NAME}'
