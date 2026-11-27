@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.0-dev.6"
+  #define MyAppVersion "1.2.0-dev.7"
 #endif
 
 #define MyAppName "SCAD Renderer"
@@ -61,6 +61,7 @@ var
   ExistingPage: TWizardPage;
   ReinstallRadio: TNewRadioButton;
   RemoveRadio: TNewRadioButton;
+  Removing: Boolean;
 
 function IsInstalled: Boolean;
 begin
@@ -81,13 +82,25 @@ begin
   ReinstallRadio := TNewRadioButton.Create(ExistingPage);
   ReinstallRadio.Parent := ExistingPage.Surface;
   ReinstallRadio.Caption := 'Переустановить SCAD Renderer';
-  ReinstallRadio.Top := 8;
+  ReinstallRadio.Left := ScaleX(0);
+  ReinstallRadio.Top := ScaleY(8);
+  ReinstallRadio.Width := ExistingPage.Surface.Width - ScaleX(8);
+  ReinstallRadio.Height := ScaleY(21);
   ReinstallRadio.Checked := True;
 
   RemoveRadio := TNewRadioButton.Create(ExistingPage);
   RemoveRadio.Parent := ExistingPage.Surface;
   RemoveRadio.Caption := 'Удалить SCAD Renderer';
-  RemoveRadio.Top := ReinstallRadio.Top + ReinstallRadio.Height + 8;
+  RemoveRadio.Left := ScaleX(0);
+  RemoveRadio.Top := ScaleY(40);
+  RemoveRadio.Width := ExistingPage.Surface.Width - ScaleX(8);
+  RemoveRadio.Height := ScaleY(21);
+end;
+
+procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
+begin
+  if Removing then
+    Confirm := False;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -137,6 +150,7 @@ begin
   end;
 
   Result := False;
+  Removing := True;
   WizardForm.Close;
 end;
 

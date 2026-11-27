@@ -1,6 +1,6 @@
 # SCAD Renderer
 
-Текущая версия: **1.2.0-dev.6** (`VERSION` 1.2.0, `BUILD` 6) · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
+Текущая версия: **1.2.0-dev.7** (`VERSION` 1.2.0, `BUILD` 7) · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
 
 Локальный рендерер вариантов OpenSCAD для Windows: контекстное меню Проводника,
 галерея результатов, 3D-просмотр, просмотр исходного кода, слоты OrcaSlicer и

@@ -23,6 +23,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   installs and registers the application in one double-click.
 - `[dev.6]` The setup detects an existing installation and offers
   reinstall or remove; a Start Menu uninstall entry is added.
+- `[dev.7]` Fix overlapping reinstall/remove choices and suppress the
+  misleading “installation not complete” prompt after removal.
 
 ## [1.2.0] - 2026-11-27
 
