@@ -1,6 +1,6 @@
 # SCAD Renderer
 
-Текущая версия: **1.2.0-dev.2** (`VERSION` 1.2.0, `BUILD` 2) · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
+Текущая версия: **1.2.0-dev.3** (`VERSION` 1.2.0, `BUILD` 3) · [История изменений](CHANGELOG.md) · [GitHub](https://github.com/akork/scad-renderer)
 
 Локальный рендерер вариантов OpenSCAD для Windows: контекстное меню Проводника,
 галерея результатов, 3D-просмотр, просмотр исходного кода, слоты OrcaSlicer и
@@ -47,7 +47,8 @@ C:\Любая\Папка\
 - локальный HTTP-сервер на `127.0.0.1:8765`;
 - 3D-вьюер;
 - просмотр кода;
-- слоты OrcaSlicer и Bambu Studio;
+- слоты OrcaSlicer и Bambu Studio с настраиваемой папкой хранения;
+  по умолчанию `C:\Users\<user>\slicer-slots`;
 - тесты.
 
 ### `scad-drop`
@@ -147,7 +148,8 @@ powershell -ExecutionPolicy Bypass -File .\scad-variants\install-notifications.p
 ```
 
 `scad-variants/state/`, `scad-drop/state/`, профили браузеров, сгенерированные
-рендеры, `orca-slots/` и `tools/` в Git не входят.
+рендеры и `tools/` в Git не входят. Слоты по умолчанию лежат в
+`%USERPROFILE%\slicer-slots`.
 
 ## Тесты
 

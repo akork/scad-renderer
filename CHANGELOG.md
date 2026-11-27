@@ -14,6 +14,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   labels survive a fresh checkout or project move.
 - `[dev.2]` The tray uses the real OpenSCAD executable icon again instead of
   the generic Scoop shim icon.
+- `[dev.3]` Slot storage is configurable from the tray; the default is the
+  visible `slicer-slots` folder in the user profile.
 
 ## [1.2.0] - 2026-11-27
 

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
-from scadvariants.paths import app_root
-from scadvariants.slots import SLOTS_ROOT
+from scadvariants.slots import DEFAULT_SLOTS_ROOT
 
 
 class PathTests(unittest.TestCase):
-    def test_slots_root_is_project_local(self) -> None:
-        self.assertEqual(SLOTS_ROOT, app_root() / "orca-slots")
+    def test_slots_default_is_in_home(self) -> None:
+        self.assertEqual(DEFAULT_SLOTS_ROOT, Path.home() / "slicer-slots")
 
 
 if __name__ == "__main__":

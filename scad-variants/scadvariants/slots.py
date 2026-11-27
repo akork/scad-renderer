@@ -20,11 +20,13 @@ from .paths import app_root
 
 APP_ROOT = app_root()
 WORKSPACE_DIR = APP_ROOT
-SLOTS_ROOT = APP_ROOT / "orca-slots"
+DEFAULT_SLOTS_ROOT = Path.home() / "slicer-slots"
+SETTINGS_PATH = APP_ROOT / "scad-variants" / "state" / "ui-settings.json"
+# Compatibility defaults; runtime code uses slots_root() so the tray can change it.
+SLOTS_ROOT = DEFAULT_SLOTS_ROOT
 SLOTS_JSON = SLOTS_ROOT / "slots.json"
 SLOTS_PAGE = SLOTS_ROOT / "index.html"
 LEGACY_SLICER_JSON = APP_ROOT / "slicer-slots" / "slots.json"
-# Backward-compatible name for callers that only need the root.
 SLOTS_DIR = SLOTS_ROOT
 
 SLICER_LABELS = {
@@ -42,6 +44,40 @@ RESERVED_NAMES = {
     *(f"COM{i}" for i in range(1, 10)),
     *(f"LPT{i}" for i in range(1, 10)),
 }
+
+
+def _read_settings() -> dict[str, Any]:
+    try:
+        data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def slots_root() -> Path:
+    override = os.environ.get("SCAD_SLOTS_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    configured = _read_settings().get("slots_root")
+    if configured:
+        return Path(str(configured)).expanduser().resolve()
+    return DEFAULT_SLOTS_ROOT
+
+
+def slots_page_path() -> Path:
+    return slots_root() / "index.html"
+
+
+def set_slots_root(path: Path | str) -> Path:
+    root = Path(path).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    data = _read_settings()
+    data["slots_root"] = str(root)
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = SETTINGS_PATH.with_name(f".{SETTINGS_PATH.name}.{uuid.uuid4().hex[:8]}.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, SETTINGS_PATH)
+    return root
 
 
 def _e(value: Any) -> str:
@@ -94,7 +130,7 @@ def validate_name(name: str) -> str:
 
 
 def slicer_dir(slicer: str) -> Path:
-    return SLOTS_ROOT / valid_slicer(slicer)
+    return slots_root() / valid_slicer(slicer)
 
 
 def slot_file(name: str, slicer: str = "orca") -> Path:
@@ -121,9 +157,10 @@ def _normalize_entry_paths(
             name = Path(raw).name
             if not name:
                 continue
+            root = slots_root()
             candidates = [
-                SLOTS_ROOT / name,
-                SLOTS_ROOT / slicer / name,
+                root / name,
+                root / slicer / name,
             ]
             for candidate in candidates:
                 if candidate.is_file():
@@ -150,7 +187,8 @@ def _read_payload(data: Any) -> dict[str, dict[str, dict[str, Any]]]:
 
 
 def _read_data() -> dict[str, dict[str, dict[str, Any]]]:
-    for path in (SLOTS_JSON, LEGACY_SLICER_JSON):
+    root_json = slots_root() / "slots.json"
+    for path in (root_json, LEGACY_SLICER_JSON):
         if not path.is_file():
             continue
         try:
@@ -170,11 +208,13 @@ def load_slots(slicer: str = "orca") -> dict[str, dict[str, Any]]:
 
 
 def _save_data(data: dict[str, dict[str, dict[str, Any]]]) -> None:
-    SLOTS_ROOT.mkdir(parents=True, exist_ok=True)
+    root = slots_root()
+    root.mkdir(parents=True, exist_ok=True)
     payload = {"version": 2, "slots": data}
-    tmp = SLOTS_JSON.with_name(f".{SLOTS_JSON.name}.{uuid.uuid4().hex[:8]}.tmp")
+    path = root / "slots.json"
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, SLOTS_JSON)
+    os.replace(tmp, path)
 
 
 def _refresh_gallery(source_dir: Path) -> None:
@@ -346,7 +386,9 @@ function deleteSlot(slicer, name) {{
     '&slicer=' + encodeURIComponent(slicer);
 }}
 </script></body></html>"""
-    SLOTS_ROOT.mkdir(parents=True, exist_ok=True)
-    tmp = SLOTS_PAGE.with_name(f".{SLOTS_PAGE.name}.{uuid.uuid4().hex[:8]}.tmp")
+    root = slots_root()
+    root.mkdir(parents=True, exist_ok=True)
+    page = root / "index.html"
+    tmp = page.with_name(f".{page.name}.{uuid.uuid4().hex[:8]}.tmp")
     tmp.write_text(html, encoding="utf-8")
-    os.replace(tmp, SLOTS_PAGE)
+    os.replace(tmp, page)

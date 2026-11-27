@@ -28,7 +28,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from .browser import open_in_isolated
-from .slots import SLOTS_PAGE
+from .slots import slots_page_path
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 STATE_DIR = PROJECT_DIR / "state"
@@ -251,8 +251,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in ("/slots", "/slots/"):
-            if SLOTS_PAGE.is_file():
-                self._file(SLOTS_PAGE)
+            page = slots_page_path()
+            if page.is_file():
+                self._file(page)
             else:
                 self._send(404, "text/plain", b"slots page not found")
             return
