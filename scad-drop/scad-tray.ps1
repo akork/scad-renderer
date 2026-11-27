@@ -995,11 +995,6 @@ $script:NotifyIcon.Icon = $icon
 $script:NotifyIcon.Text = "SCAD Render $script:AppVersionLabel"
 $script:NotifyIcon.ContextMenuStrip = $script:Menu
 $script:NotifyIcon.Visible = $true
-$script:NotifyIcon.add_MouseClick({
-    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-        $script:Menu.Show([System.Windows.Forms.Cursor]::Position)
-    }
-})
 Update-TrayTooltip
 
 $timer = New-Object System.Windows.Forms.Timer

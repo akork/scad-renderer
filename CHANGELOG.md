@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format follows Keep a Changelog, and the project uses semantic versioning.
 Git commit subjects are short labels; this file is the detailed history.
 
+## [Unreleased]
+
+### Changed
+
+- Left-clicking the tray icon no longer opens the full context menu. The menu
+  remains available by right-click as the native NotifyIcon context menu.
+
 ## [1.1.1] - 2026-11-27
 
 ### Fixed
