@@ -5,15 +5,46 @@ $gallery = Join-Path $here 'open_gallery.py'
 $slot = Join-Path $here 'slot_action.py'
 $slicer = Join-Path $here 'slicer_action.py'
 $embed = Join-Path $here 'embed_action.py'
-$pythonw = Join-Path $env:USERPROFILE '.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\pythonw.exe'
-$openscad = 'C:\Users\ak\scoop\apps\openscad\2021.01\openscad.exe'
+
+function Resolve-Pythonw {
+    $candidates = @(
+        (Join-Path $env:USERPROFILE '.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\pythonw.exe')
+    )
+    $fromPath = Get-Command 'pythonw.exe' -ErrorAction SilentlyContinue
+    if ($fromPath) { $candidates += $fromPath.Source }
+    $python = Get-Command 'python.exe' -ErrorAction SilentlyContinue
+    if ($python) { $candidates += (Join-Path (Split-Path -Parent $python.Source) 'pythonw.exe') }
+    try {
+        $launcher = Get-Command 'py.exe' -ErrorAction SilentlyContinue
+        if ($launcher) {
+            $pyPath = & $launcher.Source -3 -c "import sys; print(sys.executable)" 2>$null
+            if ($pyPath) { $candidates += (Join-Path (Split-Path -Parent ([string]$pyPath).Trim()) 'pythonw.exe') }
+        }
+    } catch { }
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) { return $candidate }
+    }
+    return $null
+}
+
+$pythonw = Resolve-Pythonw
+if (-not $pythonw) {
+    throw "pythonw.exe not found. Install Python 3.10+ with Pillow, or add pythonw.exe to PATH."
+}
+
+$openscad = $null
+$osc = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
+if ($osc) {
+    $openscad = $osc.Source
+} elseif (Test-Path 'C:\Users\ak\scoop\shims\openscad.exe') {
+    $openscad = 'C:\Users\ak\scoop\shims\openscad.exe'
+}
 
 if (-not (Test-Path -LiteralPath $server)) { throw "Not found: $server" }
 if (-not (Test-Path -LiteralPath $gallery)) { throw "Not found: $gallery" }
 if (-not (Test-Path -LiteralPath $slot)) { throw "Not found: $slot" }
 if (-not (Test-Path -LiteralPath $slicer)) { throw "Not found: $slicer" }
 if (-not (Test-Path -LiteralPath $embed)) { throw "Not found: $embed" }
-if (-not (Test-Path -LiteralPath $pythonw)) { throw "Not found: $pythonw" }
 
 $key = 'HKCU:\Software\Classes\scad-viewer'
 New-Item -Path $key -Force | Out-Null

@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 The format follows Keep a Changelog, and the project uses semantic versioning.
 Git commit subjects are short labels; this file is the detailed history.
 
+## [1.1.1] - 2026-11-27
+
+### Fixed
+
+- `install-viewer-protocol.ps1` resolves `pythonw.exe` from the DSH runtime,
+  `PATH`, `python.exe`, or the `py` launcher instead of requiring the
+  DeepSeek Harness install path on every machine.
+- Setup is portable when the repository is cloned to another computer.
+
 ## [1.1.0] - 2026-11-27
 
 Собирает локальные dev.1–dev.8 в один релиз.
