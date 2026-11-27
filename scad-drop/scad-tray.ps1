@@ -1,6 +1,5 @@
 ﻿param(
     [string]$Downloads = '',
-    [string]$ScadRoot = '',
     [string]$StateDir = '',
     [string]$InstanceName = 'ScadDropTray',
     [int]$StartDelay = 0,
@@ -15,15 +14,14 @@ if ($StartDelay -gt 0) {
 
 $ErrorActionPreference = 'Stop'
 if (-not $Downloads) { $Downloads = Join-Path $env:USERPROFILE 'Downloads' }
-if (-not $ScadRoot) { $ScadRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'SCAD' }
 if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $script:Downloads = [IO.Path]::GetFullPath($Downloads)
-$script:ScadRoot = [IO.Path]::GetFullPath($ScadRoot)
+$script:ProjectRoot = Split-Path -Parent $PSScriptRoot
 $script:StateDir = [IO.Path]::GetFullPath($StateDir)
-$workspaceRoot = Split-Path -Parent $script:ScadRoot
+$workspaceRoot = $script:ProjectRoot
 $script:AppVersion = '1.0.4'
 try {
     $v = (Get-Content -LiteralPath (Join-Path $workspaceRoot 'VERSION') -Raw).Trim()
@@ -42,8 +40,8 @@ $script:AppVersionLabel = if ($script:AppBuild -gt 0) {
 New-Item -ItemType Directory -Force -Path $script:StateDir | Out-Null
 $script:StatePath = Join-Path $script:StateDir 'tray.json'
 $script:LogPath = Join-Path $script:StateDir 'tray.log'
-$script:ProgressDir = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\state\progress'
-$script:RendererStateDir = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\state'
+$script:ProgressDir = Join-Path $script:ProjectRoot 'scad-variants\state\progress'
+$script:RendererStateDir = Join-Path $script:ProjectRoot 'scad-variants\state'
 $script:UiSettingsPath = Join-Path $script:RendererStateDir 'ui-settings.json'
 $script:GalleryServerState = Join-Path $script:RendererStateDir 'gallery-server.json'
 $script:ServerStatusItem = $null
@@ -76,7 +74,7 @@ function Normalize-Path([string]$Path) {
 
 function Get-OpenScadPath {
     # Prefer the portable Manifold-capable snapshot in the workspace.
-    $tools = Join-Path (Split-Path -Parent $script:ScadRoot) 'tools'
+    $tools = Join-Path $script:ProjectRoot 'tools'
     if (Test-Path -LiteralPath $tools) {
         $snapshots = @(
             Get-ChildItem -LiteralPath $tools -Directory -Filter 'openscad-*' `
@@ -129,7 +127,7 @@ function Get-PythonwPath {
 
 function Open-RenderPreview([string]$Index) {
     $pythonw = Get-PythonwPath
-    $helper = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\open_gallery.py'
+    $helper = Join-Path $script:ProjectRoot 'scad-variants\open_gallery.py'
     if ($pythonw -and (Test-Path -LiteralPath $helper)) {
         Start-Process -FilePath $pythonw -ArgumentList @($helper, '--reuse-tab', $Index) -WindowStyle Hidden | Out-Null
         return
@@ -204,14 +202,6 @@ public static class ScadFolderMenuIcon
         $script:FolderMenuIcon = [System.Drawing.SystemIcons]::Application.ToBitmap()
     }
     return $script:FolderMenuIcon
-}
-
-function Get-ScadFiles {
-    if (-not (Test-Path -LiteralPath $script:Downloads)) { return @() }
-    return @(
-        Get-ChildItem -LiteralPath $script:Downloads -File -Filter '*.scad' `
-            -ErrorAction SilentlyContinue | Sort-Object LastWriteTime
-    )
 }
 
 function Get-RecentRenders {
@@ -573,7 +563,7 @@ function Exit-Tray {
 }
 
 function Open-ChangelogPreview {
-    $root = Split-Path -Parent $script:ScadRoot
+    $root = $script:ProjectRoot
     $source = Join-Path $root 'CHANGELOG.md'
     if (-not (Test-Path -LiteralPath $source)) {
         Write-TrayLog "changelog missing: $source"
@@ -713,7 +703,7 @@ function Open-RenderHtml([string]$Path) {
         return
     }
     $pythonw = Get-PythonwPath
-    $helper = Join-Path (Split-Path -Parent $script:ScadRoot) 'scad-variants\open_gallery.py'
+    $helper = Join-Path $script:ProjectRoot 'scad-variants\open_gallery.py'
     if (-not $pythonw -or -not (Test-Path -LiteralPath $helper)) {
         Write-TrayLog "gallery helper missing"
         return

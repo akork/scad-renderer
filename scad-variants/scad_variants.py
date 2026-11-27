@@ -14,13 +14,8 @@ from scadvariants.render import (
 )
 from scadvariants.watch import APP_VERSION_DISPLAY, WatchConfig, Watcher, _now_iso
 
-DEFAULT_INPUT_DIR = "SCAD"
 PROJECT_DIR = Path(__file__).resolve().parent
 WORKSPACE_DIR = PROJECT_DIR.parent
-
-
-def _default_root() -> Path:
-    return WORKSPACE_DIR / DEFAULT_INPUT_DIR
 
 
 def _default_state() -> Path:

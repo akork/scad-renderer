@@ -16,6 +16,8 @@ follows Keep a Changelog and the project uses semantic versioning.
   including changes that have not been pushed yet.
 - `[dev.7]` Slicer integration is adapter-based: OrcaSlicer and Bambu Studio
   can use independent stable slots.
+- `[dev.8]` Rendering always writes results next to the source file; fixed
+  `SCAD` and `deliverables` folders are no longer used.
 
 ## [1.1.2] - 2026-11-27
 

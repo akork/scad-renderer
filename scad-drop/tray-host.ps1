@@ -1,13 +1,11 @@
-param(
+﻿param(
     [string]$Downloads = '',
-    [string]$ScadRoot = '',
     [string]$StateDir = '',
     [string]$InstanceName = 'ScadDropTray'
 )
 
 $ErrorActionPreference = 'Stop'
 if (-not $Downloads) { $Downloads = Join-Path $env:USERPROFILE 'Downloads' }
-if (-not $ScadRoot) { $ScadRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'SCAD' }
 if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
@@ -40,7 +38,6 @@ while ($true) {
     $argLine = '-NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File "' +
         $trayScript + '"' +
         ' -Downloads "' + $Downloads + '"' +
-        ' -ScadRoot "' + $ScadRoot + '"' +
         ' -StateDir "' + $StateDir + '"' +
         ' -InstanceName "' + $InstanceName + '"'
 
