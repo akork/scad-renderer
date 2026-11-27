@@ -8,6 +8,7 @@ Bambu Studio can keep independent sets without interfering.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -34,6 +35,7 @@ SLICER_LABELS = {
     "bambu": "Bambu Studio",
 }
 SLICER_ORDER = tuple(SLICER_LABELS)
+LOG = logging.getLogger("scad-slots")
 SLOT_NAME_RE = re.compile(r'^[^<>:"/\\|?*\x00-\x1f]{1,40}$')
 SLICER_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,23}$")
 RESERVED_NAMES = {
@@ -387,8 +389,11 @@ function deleteSlot(slicer, name) {{
 }}
 </script></body></html>"""
     root = slots_root()
-    root.mkdir(parents=True, exist_ok=True)
-    page = root / "index.html"
-    tmp = page.with_name(f".{page.name}.{uuid.uuid4().hex[:8]}.tmp")
-    tmp.write_text(html, encoding="utf-8")
-    os.replace(tmp, page)
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        page = root / "index.html"
+        tmp = page.with_name(f".{page.name}.{uuid.uuid4().hex[:8]}.tmp")
+        tmp.write_text(html, encoding="utf-8")
+        os.replace(tmp, page)
+    except OSError as exc:
+        LOG.warning("could not write slots page in %s: %s", root, exc)

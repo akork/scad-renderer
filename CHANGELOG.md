@@ -16,6 +16,9 @@ follows Keep a Changelog and the project uses semantic versioning.
   the generic Scoop shim icon.
 - `[dev.3]` Slot storage is configurable from the tray; the default is the
   visible `slicer-slots` folder in the user profile.
+- `[dev.4]` Release packaging: one `SCADRenderer.exe` with embedded
+  `install`/`uninstall`, plus the PowerShell tray scripts, viewer assets and
+  fallback installer.
 
 ## [1.2.0] - 2026-11-27
 

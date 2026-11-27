@@ -21,8 +21,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from .browser import find_browser
+from .paths import app_root
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
+PROJECT_DIR = app_root() / "scad-variants"
 STATE_DIR = PROJECT_DIR / "state"
 STATE_PATH = STATE_DIR / "edge-preview.json"
 LOG_PATH = STATE_DIR / "edge-preview.log"

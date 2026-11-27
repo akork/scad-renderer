@@ -9,13 +9,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .paths import app_root
+
 LOG = logging.getLogger(__name__)
 
 # The tray icon reads this directory from every renderer process, including
 # one-shot context-menu renders that use a temporary state folder.
-DEFAULT_PROGRESS_DIR = (
-    Path(__file__).resolve().parent.parent / "state" / "progress"
-)
+DEFAULT_PROGRESS_DIR = app_root() / "scad-variants" / "state" / "progress"
 
 
 def _now() -> str:

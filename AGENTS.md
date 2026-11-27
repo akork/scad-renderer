@@ -2,7 +2,7 @@
 
 - Version source of truth: `VERSION` at the repository root.
 - Local build counter: `BUILD` at the repository root.
-- Current version: `1.2.0-dev.3` (`VERSION` 1.2.0, `BUILD` 3).
+- Current version: `1.2.0-dev.4` (`VERSION` 1.2.0, `BUILD` 4).
 - After each completed local change, increment `BUILD`; display
   `VERSION-dev.BUILD`. Before a release, bump `VERSION`, reset `BUILD` to 0,
   then tag the release.

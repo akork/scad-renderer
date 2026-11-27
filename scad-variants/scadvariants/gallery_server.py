@@ -28,13 +28,14 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from .browser import open_in_isolated
+from .paths import app_root, resource_root
 from .slots import slots_page_path
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
+PROJECT_DIR = app_root() / "scad-variants"
 STATE_DIR = PROJECT_DIR / "state"
 STATE_PATH = STATE_DIR / "gallery-server.json"
 LOG_PATH = STATE_DIR / "gallery-server.log"
-VIEWER_DIR = PROJECT_DIR / "viewer"
+VIEWER_DIR = resource_root() / "viewer"
 VIEWER_HTML = VIEWER_DIR / "viewer.html"
 VENDOR_DIR = VIEWER_DIR / "vendor"
 IDLE_SECONDS = 2 * 60 * 60
@@ -115,17 +116,21 @@ def ensure_server(port: int = DEFAULT_PORT) -> tuple[str, int]:
         pass
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     executable = pythonw if pythonw.is_file() else Path(sys.executable)
-    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    subprocess.Popen(
-        [
+    if getattr(sys, "frozen", False):
+        command = [str(executable), "serve", "--port", str(port)]
+    else:
+        command = [
             str(executable),
             "-m",
             "scadvariants.gallery_server",
             "--serve",
             "--port",
             str(port),
-        ],
-        cwd=str(PROJECT_DIR),
+        ]
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    subprocess.Popen(
+        command,
+        cwd=str(app_root()),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

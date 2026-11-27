@@ -11,13 +11,14 @@ if ($StartDelay -gt 0) {
 }
 
 $ErrorActionPreference = 'Stop'
-if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
+if (-not $StateDir) { $StateDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'scad-drop\state' }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $script:ProjectRoot = Split-Path -Parent $PSScriptRoot
 $script:StateDir = [IO.Path]::GetFullPath($StateDir)
 $workspaceRoot = $script:ProjectRoot
+$script:BackendExe = Join-Path $script:ProjectRoot 'SCADRenderer.exe'
 $script:AppVersion = '1.0.4'
 try {
     $v = (Get-Content -LiteralPath (Join-Path $workspaceRoot 'VERSION') -Raw).Trim()
@@ -148,6 +149,10 @@ function Get-PythonwPath {
 }
 
 function Open-RenderPreview([string]$Index) {
+    if (Test-Path -LiteralPath $script:BackendExe) {
+        Start-Process -FilePath $script:BackendExe -ArgumentList @('gallery', '--reuse-tab', $Index) -WindowStyle Hidden | Out-Null
+        return
+    }
     $pythonw = Get-PythonwPath
     $helper = Join-Path $script:ProjectRoot 'scad-variants\open_gallery.py'
     if ($pythonw -and (Test-Path -LiteralPath $helper)) {

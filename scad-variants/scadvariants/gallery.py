@@ -360,7 +360,7 @@ def _ps_literal(value: str | Path) -> str:
 
 def _write_open_shortcut(source_dir: Path) -> None:
     """Create a Windows shortcut that opens the gallery in the isolated browser."""
-    if os.name != "nt":
+    if os.name != "nt" or getattr(sys, "frozen", False):
         return
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     if not pythonw.is_file():

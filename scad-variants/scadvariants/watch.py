@@ -31,26 +31,23 @@ from .progress import ProgressWriter
 from .render import RenderSettings, make_contact_sheet, render_variant
 from .browser import auto_open_results_enabled
 from .gallery_server import open_gallery_page
+from .paths import app_root
 
 LOG = logging.getLogger("scadvariants")
 
 
 def _read_app_version() -> tuple[str, int]:
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "VERSION"
-        try:
-            value = candidate.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        if not value:
-            continue
-        build = 0
-        try:
-            build = int((parent / "BUILD").read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
-            pass
-        return value, max(0, build)
-    return "1.0.0", 0
+    root = app_root()
+    try:
+        value = (root / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        return "1.0.0", 0
+    build = 0
+    try:
+        build = int((root / "BUILD").read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        pass
+    return (value or "1.0.0"), max(0, build)
 
 
 APP_VERSION, APP_BUILD = _read_app_version()

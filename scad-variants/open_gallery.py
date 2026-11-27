@@ -24,8 +24,9 @@ from scadvariants.gallery_server import (
     open_gallery_page,
     viewer_url,
 )
+from scadvariants.paths import app_root
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = app_root() / "scad-variants"
 STATE_DIR = PROJECT_DIR / "state"
 LOG_PATH = STATE_DIR / "gallery.log"
 LOG = logging.getLogger("scad-gallery")

@@ -10,6 +10,8 @@
 !/CHANGELOG.md
 !/scad-variants/
 !/scad-drop/
+!/packaging/
+!packaging/**
 
 # Runtime state, browser profiles, logs and caches
 scad-variants/state/
@@ -18,7 +20,15 @@ scad-variants/**/__pycache__/
 scad-variants/**/*.pyc
 scad-drop/state/
 scad-drop/**/__pycache__/
+packaging/**/__pycache__/
 scad-drop/**/*.pyc
+
+# Build artifacts
+dist/
+dist-debug/
+release/
+pybuild/
+pybuild-debug/
 
 # Local generated renders / slots / tool binaries are never part of the app
 orca-slots/
