@@ -16,10 +16,10 @@
         "scad-variants/state"
     ],
     "post_install": [
-        "& \"$dir\\SCADRenderer.exe\" install --quiet --target \"$dir\""
+        "Start-Process -FilePath \"$dir\\SCADRenderer.exe\" -ArgumentList ('install --quiet --target \"' + $dir + '\"') -Wait -WindowStyle Hidden"
     ],
     "pre_uninstall": [
-        "& \"$dir\\SCADRenderer.exe\" unregister --quiet --target \"$dir\""
+        "$root = Split-Path $dir -Parent; Get-CimInstance Win32_Process -Filter \"Name='SCADRenderer.exe'\" | Where-Object { $_.ExecutablePath -like \"$root\\*\" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -match 'tray-host|scad-tray' -and $_.CommandLine -like \"*$root*\" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Unregister-ScheduledTask -TaskName 'SCAD Render Tray' -Confirm:$false -ErrorAction SilentlyContinue; Remove-Item 'HKCU:\\Software\\Classes\\SystemFileAssociations\\.scad\\shell\\SCADRender' -Recurse -Force -ErrorAction SilentlyContinue; foreach($p in 'scad-viewer','scad-gallery','scad-slot','scad-slicer','scad-embed'){ Remove-Item ('HKCU:\\Software\\Classes\\' + $p) -Recurse -Force -ErrorAction SilentlyContinue }; Remove-Item (Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\SCAD Render.lnk') -Force -ErrorAction SilentlyContinue"
     ],
     "checkver": {
         "github": "https://github.com/akork/scad-renderer"
