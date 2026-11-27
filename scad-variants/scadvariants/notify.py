@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from .paths import resource_root
+
 LOG = logging.getLogger("scadvariants")
 
 APP_USER_MODEL_ID = "ScadDrop.Render"
-TOAST_SCRIPT = Path(__file__).with_name("show-toast.ps1")
+TOAST_SCRIPT = resource_root() / "scadvariants" / "show-toast.ps1"
 _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 

@@ -14,9 +14,11 @@ import subprocess
 import webbrowser
 from pathlib import Path
 
+from .paths import app_root
+
 LOG = logging.getLogger(__name__)
 
-STATE_DIR = Path(__file__).resolve().parent.parent / "state"
+STATE_DIR = app_root() / "scad-variants" / "state"
 SETTINGS_PATH = STATE_DIR / "ui-settings.json"
 EDGE_CANDIDATES = (
     Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),

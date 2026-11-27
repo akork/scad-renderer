@@ -6,6 +6,39 @@ Technical details, implementation attempts and architecture decisions belong in
 commit bodies, an optional `DEVLOG.md`, or ADRs — not in this file. The format
 follows Keep a Changelog and the project uses semantic versioning.
 
+## [1.3.0] - 2026-11-27
+
+### Added
+
+- A standard Windows setup wizard, `SCADRendererSetup.exe`, with a normal
+  double-click installation flow.
+- A custom installation folder.
+- Reinstall and remove choices when the application is already installed.
+- A Start Menu uninstall shortcut and a Windows Apps & Features entry.
+- A timed “SCAD Renderer removed” confirmation after uninstallation.
+- An uninstall option, enabled by default, to remove settings, logs and the
+  preview browser profile while preserving `slicer-slots`.
+- A single `SCADRenderer.exe` that bundles Python, Pillow, the renderer,
+  gallery server, slots and 3D viewer assets.
+
+### Changed
+
+- Slot storage is configurable from the tray; the default is
+  `%USERPROFILE%\slicer-slots` instead of a project-local folder.
+- The tray menu shows the current slots folder and opens a folder picker.
+- The application is installed per user under
+  `%LOCALAPPDATA%\Programs\SCADRenderer` by default.
+
+### Fixed
+
+- PowerShell scripts keep their UTF-8 BOM, so Cyrillic labels survive a fresh
+  checkout or project move.
+- The tray uses the real OpenSCAD executable icon instead of the generic
+  Scoop shim icon.
+- Reinstall and remove choices no longer overlap.
+- Removal no longer shows a misleading “installation not complete” prompt.
+- The removal confirmation window uses a compact size.
+
 ## [1.2.0] - 2026-11-27
 
 ### Added

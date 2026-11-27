@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from .slots import SLICER_LABELS, SLOTS_PAGE, load_all_slots, write_slots_page
+from .slots import SLICER_LABELS, load_all_slots, slots_page_path, write_slots_page
 
 try:
     from zoneinfo import ZoneInfo
@@ -360,7 +360,7 @@ def _ps_literal(value: str | Path) -> str:
 
 def _write_open_shortcut(source_dir: Path) -> None:
     """Create a Windows shortcut that opens the gallery in the isolated browser."""
-    if os.name != "nt":
+    if os.name != "nt" or getattr(sys, "frozen", False):
         return
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     if not pythonw.is_file():
@@ -1176,7 +1176,7 @@ def write_source_page(
     folder_uri = folder_path.as_uri().rstrip("/") + "/"
     folder_actions = (
         f'<a id="slots-link" class="btn" style="border-color:#0f766e;color:#0f766e" '
-        f'href="{_e(SLOTS_PAGE.resolve().as_uri())}" target="_blank" '
+        f'href="{_e(slots_page_path().resolve().as_uri())}" target="_blank" '
         f'rel="noopener">Слоты слайсеров</a>'
         f'<a class="btn" style="border-color:#0f766e;color:#0f766e" '
         f'href="{_e(folder_uri)}" target="_blank" rel="noopener">Открыть папку</a>'

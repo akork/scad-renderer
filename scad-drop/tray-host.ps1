@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
+if (-not $StateDir) { $StateDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'scad-drop\state' }
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
 namespace ScadTrayHost {

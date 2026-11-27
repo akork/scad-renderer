@@ -27,10 +27,15 @@ DEFAULT_RENDER_TIMEOUT = 3600.0
 DEFAULT_POLL = 2.0
 
 PROJECT_DIR = Path(__file__).resolve().parent
-WORKSPACE_DIR = PROJECT_DIR.parent
-DEFAULT_TOOL = WORKSPACE_DIR / "scad-variants" / "scad_variants.py"
-DEFAULT_RENDERER_STATE = WORKSPACE_DIR / "scad-variants" / "state"
-DEFAULT_STATE = PROJECT_DIR / "state"
+APP_ROOT = (
+    Path(sys.executable).resolve().parent
+    if getattr(sys, "frozen", False)
+    else PROJECT_DIR.parent
+)
+WORKSPACE_DIR = APP_ROOT
+DEFAULT_TOOL = APP_ROOT / "scad-variants" / "scad_variants.py"
+DEFAULT_RENDERER_STATE = APP_ROOT / "scad-variants" / "state"
+DEFAULT_STATE = APP_ROOT / "scad-drop" / "state"
 
 LOG = logging.getLogger(APP_NAME)
 
@@ -143,7 +148,7 @@ def _record_recent(index: Path, source: Path, state_root: Path) -> None:
 
 def open_gallery(index: Path) -> None:
     try:
-        variants_dir = str(WORKSPACE_DIR / "scad-variants")
+        variants_dir = str(APP_ROOT / "scad-variants")
         if variants_dir not in sys.path:
             sys.path.insert(0, variants_dir)
         from scadvariants.browser import auto_open_results_enabled
@@ -180,7 +185,7 @@ def render_one_file(
         LOG.error("%s", message)
         show_error(message)
         return 2
-    if not tool.is_file():
+    if not getattr(sys, "frozen", False) and not tool.is_file():
         message = f"Не найден scad_variants.py:\n{tool}"
         LOG.error("%s", message)
         show_error(message)
@@ -188,20 +193,35 @@ def render_one_file(
 
     temp_state = renderer_state / f"context-{uuid.uuid4().hex[:8]}"
     temp_state.mkdir(parents=True, exist_ok=True)
-    command = [
-        sys.executable,
-        "-u",
-        str(tool),
-        "--once",
-        "--root",
-        str(source.parent),
-        "--state",
-        str(temp_state),
-        "--only",
-        _glob_exact(source.name),
-        "--force",
-        "--no-auto-open",
-    ]
+    if getattr(sys, "frozen", False):
+        command = [
+            sys.executable,
+            "render-core",
+            "--once",
+            "--root",
+            str(source.parent),
+            "--state",
+            str(temp_state),
+            "--only",
+            _glob_exact(source.name),
+            "--force",
+            "--no-auto-open",
+        ]
+    else:
+        command = [
+            sys.executable,
+            "-u",
+            str(tool),
+            "--once",
+            "--root",
+            str(source.parent),
+            "--state",
+            str(temp_state),
+            "--only",
+            _glob_exact(source.name),
+            "--force",
+            "--no-auto-open",
+        ]
     LOG.info("context render: %s", source)
     try:
         returncode = subprocess.call(command, cwd=str(tool.parent))

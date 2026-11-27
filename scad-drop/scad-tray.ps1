@@ -11,13 +11,14 @@ if ($StartDelay -gt 0) {
 }
 
 $ErrorActionPreference = 'Stop'
-if (-not $StateDir) { $StateDir = Join-Path $PSScriptRoot 'state' }
+if (-not $StateDir) { $StateDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'scad-drop\state' }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $script:ProjectRoot = Split-Path -Parent $PSScriptRoot
 $script:StateDir = [IO.Path]::GetFullPath($StateDir)
 $workspaceRoot = $script:ProjectRoot
+$script:BackendExe = Join-Path $script:ProjectRoot 'SCADRenderer.exe'
 $script:AppVersion = '1.0.4'
 try {
     $v = (Get-Content -LiteralPath (Join-Path $workspaceRoot 'VERSION') -Raw).Trim()
@@ -45,6 +46,8 @@ $script:ServerCpuLast = $null
 $script:ServerCpuAt = $null
 
 $script:AutoOpenResults = $true
+$script:SlotsRoot = Join-Path $env:USERPROFILE 'slicer-slots'
+$script:SlotsMenuItem = $null
 $script:RestartRequested = $false
 $script:ProgressUi = @()
 $script:MenuFilter = $null
@@ -84,8 +87,6 @@ function Get-OpenScadPath {
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
     }
-    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
     $bases = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)
     foreach ($base in $bases) {
         if (-not $base) { continue }
@@ -116,10 +117,26 @@ function Get-OpenScadPath {
         $choco = Join-Path $env:ProgramData 'chocolatey\bin\openscad.exe'
         if (Test-Path -LiteralPath $choco) { return $choco }
     }
+    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
     return $null
 }
 
 function Get-OpenScadIconPath {
+    $appsRoot = Join-Path $env:USERPROFILE 'scoop\apps\openscad'
+    if (Test-Path -LiteralPath $appsRoot) {
+        $versions = @(
+            Get-ChildItem -LiteralPath $appsRoot -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ne 'current' } |
+                Sort-Object Name -Descending
+        )
+        foreach ($version in $versions) {
+            $candidate = Join-Path $version.FullName 'openscad.exe'
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+        $current = Join-Path $appsRoot 'current\openscad.exe'
+        if (Test-Path -LiteralPath $current) { return $current }
+    }
     return (Get-OpenScadPath)
 }
 
@@ -132,6 +149,10 @@ function Get-PythonwPath {
 }
 
 function Open-RenderPreview([string]$Index) {
+    if (Test-Path -LiteralPath $script:BackendExe) {
+        Start-Process -FilePath $script:BackendExe -ArgumentList @('gallery', '--reuse-tab', $Index) -WindowStyle Hidden | Out-Null
+        return
+    }
     $pythonw = Get-PythonwPath
     $helper = Join-Path $script:ProjectRoot 'scad-variants\open_gallery.py'
     if ($pythonw -and (Test-Path -LiteralPath $helper)) {
@@ -404,12 +425,15 @@ function Update-ProgressMenu {
 function Save-RendererSettings {
     try {
         New-Item -ItemType Directory -Force -Path $script:RendererStateDir | Out-Null
-        $payload = [ordered]@{ auto_open_results = [bool]$script:AutoOpenResults }
+        $payload = [ordered]@{
+            auto_open_results = [bool]$script:AutoOpenResults
+            slots_root = [string]$script:SlotsRoot
+        }
         $json = $payload | ConvertTo-Json
         $tmp = $script:UiSettingsPath + '.tmp'
         Set-Content -LiteralPath $tmp -Value $json -Encoding UTF8
         Move-Item -LiteralPath $tmp -Destination $script:UiSettingsPath -Force
-        Write-TrayLog "auto_open_results=$($script:AutoOpenResults)"
+        Write-TrayLog "auto_open_results=$($script:AutoOpenResults) slots_root=$($script:SlotsRoot)"
     } catch {
         Write-TrayLog "settings save failed: $($_.Exception.Message)"
     }
@@ -422,8 +446,53 @@ function Load-RendererSettings {
         if ($saved.PSObject.Properties.Name -contains 'auto_open_results') {
             $script:AutoOpenResults = [bool]$saved.auto_open_results
         }
+        if ($saved.PSObject.Properties.Name -contains 'slots_root' -and $saved.slots_root) {
+            $script:SlotsRoot = [IO.Path]::GetFullPath([string]$saved.slots_root)
+        }
     } catch {
         Write-TrayLog "settings read failed: $($_.Exception.Message)"
+    }
+}
+
+function Update-SlotsMenuItem {
+    if (-not $script:SlotsMenuItem) { return }
+    $script:SlotsMenuItem.Text = 'Слоты: ' + $script:SlotsRoot
+    $script:SlotsMenuItem.ToolTipText = $script:SlotsRoot
+}
+
+function Select-SlotsFolder {
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = 'Выберите папку со слотами слайсеров'
+    $dialog.SelectedPath = $script:SlotsRoot
+    $dialog.ShowNewFolderButton = $true
+    try {
+        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $selected = [IO.Path]::GetFullPath($dialog.SelectedPath)
+            New-Item -ItemType Directory -Force -Path $selected | Out-Null
+            $script:SlotsRoot = $selected
+            Save-RendererSettings
+            Update-SlotsMenuItem
+            Write-TrayLog "slots root changed: $selected"
+            if (Test-Path -LiteralPath $script:GalleryServerState) {
+                try {
+                    $state = Get-Content -LiteralPath $script:GalleryServerState -Raw | ConvertFrom-Json
+                    $serverPid = [int]$state.pid
+                    $proc = Get-Process -Id $serverPid -ErrorAction SilentlyContinue
+                    if ($proc) {
+                        Stop-Process -Id $serverPid -Force
+                        Write-TrayLog "gallery server stopped after slots change"
+                    }
+                } catch { }
+            }
+            $null = [System.Windows.Forms.MessageBox]::Show(
+                "Папка слотов изменена:`n`n$selected",
+                'SCAD Render',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
+        }
+    } finally {
+        $dialog.Dispose()
     }
 }
 
@@ -762,6 +831,14 @@ function Build-TrayMenu {
         }
 
         [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+        $slotsItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $slotsItem.Text = 'Слоты: ' + $script:SlotsRoot
+        $slotsItem.ToolTipText = $script:SlotsRoot
+        $slotsItem.add_Click({ Select-SlotsFolder })
+        $script:SlotsMenuItem = $slotsItem
+        Update-SlotsMenuItem
+        [void]$menu.Items.Add($slotsItem)
 
         $service = New-Object System.Windows.Forms.ToolStripMenuItem
         $service.Text = 'Сервис'

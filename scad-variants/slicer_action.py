@@ -19,13 +19,14 @@ import urllib.parse
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from scadvariants.paths import app_root, resource_root
 from scadvariants.slicers import get_adapter
 from scadvariants.slots import assign_slot, delete_slot
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = app_root() / "scad-variants"
 STATE_DIR = PROJECT_DIR / "state"
 LOG_PATH = STATE_DIR / "slicer.log"
-TOAST_SCRIPT = PROJECT_DIR / "scadvariants" / "show-toast.ps1"
+TOAST_SCRIPT = resource_root() / "scadvariants" / "show-toast.ps1"
 LOG = logging.getLogger("scad-slicer")
 
 
