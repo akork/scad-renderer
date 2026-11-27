@@ -11,6 +11,8 @@
 !/scad-variants/
 !/scad-drop/
 !/packaging/
+!/bucket/
+!bucket/**
 !packaging/**
 
 # Runtime state, browser profiles, logs and caches
