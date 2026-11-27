@@ -242,6 +242,16 @@ def install(*, quiet: bool = False) -> int:
     return 0
 
 
+def unregister(*, quiet: bool = False) -> int:
+    """Remove shell integrations and autostart, but keep the app folder."""
+    _stop_old(TARGET)
+    _unregister_startup()
+    _unregister_shell()
+    if not quiet:
+        _show("Интеграции SCAD Renderer удалены.")
+    return 0
+
+
 def uninstall(*, quiet: bool = False) -> int:
     _stop_old(TARGET)
     _unregister_startup()

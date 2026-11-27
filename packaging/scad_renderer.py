@@ -17,7 +17,8 @@ def usage() -> int:
         "usage: SCADRenderer.exe "
         "render-file PATH | render-core ARGS... | gallery ARGS... | "
         "viewer URI | ensure URI | slot URI | slicer URI | serve [--port N] | "
-        "install [--quiet] | uninstall [--quiet] | doctor",
+        "install [--quiet] | uninstall [--quiet] | unregister [--quiet] | "
+        "doctor",
         file=sys.stderr,
     )
     return 2
@@ -81,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
         from scadvariants.release_install import uninstall
 
         return uninstall(quiet="--quiet" in args)
+    if mode == "unregister":
+        from scadvariants.release_install import unregister
+
+        return unregister(quiet="--quiet" in args)
     if mode == "doctor":
         return doctor()
     if mode in {"version", "--version", "-v"}:

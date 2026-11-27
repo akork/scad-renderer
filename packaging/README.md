@@ -1,12 +1,30 @@
 # Release packaging
 
-## Build
+## Build application
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\packaging\build-release.ps1
 ```
 
+## Build installer
+
+Requires Inno Setup 6:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\packaging\build-installer.ps1
+```
+
 Output:
+
+```text
+release\SCADRendererSetup-<VERSION>.exe
+```
+
+The setup wizard installs the full application into
+`%LOCALAPPDATA%\Programs\SCADRenderer`, registers the shell integrations,
+creates the Start Menu shortcut and adds an uninstaller entry.
+
+## Release folder
 
 ```text
 release\SCADRenderer-<VERSION>-win64\
@@ -30,18 +48,13 @@ slots and the 3D assets. Python is not required on the target machine.
 
 OpenSCAD and Edge remain external.
 
-## Install
-
-Primary installer:
+## Manual install
 
 ```powershell
 .\SCADRenderer.exe install
 ```
 
-It copies the release to `%LOCALAPPDATA%\Programs\SCADRenderer` and registers
-the context menu, protocols, tray autostart and Start Menu shortcut.
-
-Fallback for manual setup:
+Fallback:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
@@ -53,8 +66,11 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 .\SCADRenderer.exe uninstall
 ```
 
-or:
+The installed setup also appears in Windows Apps & Features.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Remove
-```
+## Data
+
+- slots: `%USERPROFILE%\slicer-slots`;
+- state: `<install>\scad-variants\state`;
+- recent renders: `<install>\scad-drop\state\recent.json`.
+

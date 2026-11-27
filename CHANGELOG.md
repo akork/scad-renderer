@@ -19,6 +19,8 @@ follows Keep a Changelog and the project uses semantic versioning.
 - `[dev.4]` Release packaging: one `SCADRenderer.exe` with embedded
   `install`/`uninstall`, plus the PowerShell tray scripts, viewer assets and
   fallback installer.
+- `[dev.5]` A standard Windows setup wizard, `SCADRendererSetup.exe`, which
+  installs and registers the application in one double-click.
 
 ## [1.2.0] - 2026-11-27
 
