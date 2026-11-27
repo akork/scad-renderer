@@ -12,6 +12,8 @@ follows Keep a Changelog and the project uses semantic versioning.
 
 - `[dev.1]` PowerShell installer scripts keep the UTF-8 BOM, so Cyrillic
   labels survive a fresh checkout or project move.
+- `[dev.2]` The tray uses the real OpenSCAD executable icon again instead of
+  the generic Scoop shim icon.
 
 ## [1.2.0] - 2026-11-27
 

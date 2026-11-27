@@ -84,8 +84,6 @@ function Get-OpenScadPath {
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
     }
-    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
     $bases = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA)
     foreach ($base in $bases) {
         if (-not $base) { continue }
@@ -116,10 +114,26 @@ function Get-OpenScadPath {
         $choco = Join-Path $env:ProgramData 'chocolatey\bin\openscad.exe'
         if (Test-Path -LiteralPath $choco) { return $choco }
     }
+    $cmd = Get-Command 'openscad.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
     return $null
 }
 
 function Get-OpenScadIconPath {
+    $appsRoot = Join-Path $env:USERPROFILE 'scoop\apps\openscad'
+    if (Test-Path -LiteralPath $appsRoot) {
+        $versions = @(
+            Get-ChildItem -LiteralPath $appsRoot -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ne 'current' } |
+                Sort-Object Name -Descending
+        )
+        foreach ($version in $versions) {
+            $candidate = Join-Path $version.FullName 'openscad.exe'
+            if (Test-Path -LiteralPath $candidate) { return $candidate }
+        }
+        $current = Join-Path $appsRoot 'current\openscad.exe'
+        if (Test-Path -LiteralPath $current) { return $current }
+    }
     return (Get-OpenScadPath)
 }
 
